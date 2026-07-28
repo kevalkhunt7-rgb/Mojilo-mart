@@ -1,0 +1,167 @@
+import { Center, Decal, useGLTF } from "@react-three/drei";
+import { useEffect, useRef, useState } from "react";
+import * as THREE from "three";
+
+export function TshirtModel({
+  tshirtColor,
+  designTexture,
+  designTextureBack,
+  onViewChange,
+}) {
+  const { nodes, materials } = useGLTF("/3Dmodels/02.glb");
+  const [frontTexture, setFrontTexture] = useState(null);
+  const [backTexture, setBackTexture] = useState(null);
+  const meshRef = useRef();
+
+  useEffect(() => {
+    let active = true;
+    let loadedTexture = null;
+
+    if (designTexture) {
+      const loader = new THREE.TextureLoader();
+      loader.load(designTexture, (tex) => {
+        if (!active) { tex.dispose(); return; }
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.minFilter = THREE.LinearFilter;
+        tex.generateMipmaps = false;
+        setFrontTexture(tex);
+        loadedTexture = tex;
+      });
+    } else {
+      setFrontTexture(null);
+    }
+
+    return () => {
+      active = false;
+      if (loadedTexture) loadedTexture.dispose();
+    };
+  }, [designTexture]);
+
+  useEffect(() => {
+    let active = true;
+    let loadedTexture = null;
+
+    if (designTextureBack) {
+      const loader = new THREE.TextureLoader();
+      loader.load(designTextureBack, (tex) => {
+        if (!active) { tex.dispose(); return; }
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.minFilter = THREE.LinearFilter;
+        tex.generateMipmaps = false;
+        setBackTexture(tex);
+        loadedTexture = tex;
+      });
+    } else {
+      setBackTexture(null);
+    }
+
+    return () => {
+      active = false;
+      if (loadedTexture) loadedTexture.dispose();
+    };
+  }, [designTextureBack]);
+
+  useEffect(() => {
+    if (meshRef.current) {
+      meshRef.current.material.color.set(tshirtColor);
+    }
+  }, [tshirtColor]);
+
+  return (
+    <Center position={[0, 0.5, 0]}>
+      <group dispose={null}>
+        <group rotation={[Math.PI / 2, 0, 0]}>
+          <mesh
+            scale={13}
+            position={[0, 0, 2]}
+            castShadow
+            receiveShadow
+            geometry={nodes["T-Shirt_1"].geometry}
+            material={materials.Shirt}
+          />
+          <mesh
+            castShadow
+            receiveShadow
+            geometry={nodes["T-Shirt_2"].geometry}
+            scale={13}
+            position={[0, 0, 2]}
+            material={materials["front.001"]}
+          >
+            <meshBasicMaterial transparent opacity={0} />
+            {frontTexture && (
+              <Decal
+                position={[0, 0.2, -0.31]}
+                rotation={[-Math.PI / 2 - 0.05, 0, 0]}
+                scale={[0.52, 0.7, 0.5]}
+                onClick={() => onViewChange?.("front")}
+              >
+                <meshStandardMaterial
+                  map={frontTexture}
+                  toneMapped={false}
+                  transparent
+                  polygonOffset
+                  polygonOffsetFactor={-1}
+                />
+              </Decal>
+            )}
+          </mesh>
+          <mesh
+            castShadow
+            receiveShadow
+            geometry={nodes["T-Shirt_3"].geometry}
+            material={materials.back}
+            scale={13}
+            position={[0, 0, 2]}
+          >
+            <meshBasicMaterial transparent opacity={0} />
+            {backTexture && (
+              <Decal
+                position={[0, -0.2, -0.27]}
+                rotation={[Math.PI / 2 - 0.2, 0, Math.PI]}
+                scale={[0.52, 0.7, 0.5]}
+                onClick={() => onViewChange?.("back")}
+              >
+                <meshStandardMaterial
+                  map={backTexture}
+                  toneMapped={false}
+                  transparent
+                  polygonOffset
+                  polygonOffsetFactor={-1}
+                />
+              </Decal>
+            )}
+          </mesh>
+          <mesh
+            castShadow
+            receiveShadow
+            geometry={nodes["T-Shirt_4"].geometry}
+            material={materials["left hand"]}
+            scale={13}
+            position={[0, 0, 2]}
+          />
+          <mesh
+            castShadow
+            receiveShadow
+            geometry={nodes["T-Shirt_5"].geometry}
+            material={materials["right hand"]}
+            scale={13}
+            position={[0, 0, 2]}
+          />
+        </group>
+        <group rotation={[Math.PI / 2, 0, 0]}>
+          <mesh
+            castShadow
+            receiveShadow
+            geometry={nodes["T-Shirt001"].geometry}
+            material={materials.background}
+            scale={13}
+            position={[0, 0, 2]}
+            ref={meshRef}
+          />
+        </group>
+      </group>
+    </Center>
+  );
+}
+
+useGLTF.preload("/3Dmodels/02.glb");

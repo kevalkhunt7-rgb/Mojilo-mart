@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 800" width="100%" height="100%">
+  <g fill="none" stroke="#71717a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Main Sleeve Body (Side Profile) -->
+    <path d="M 180 200 C 220 180, 380 180, 420 200 C 450 320, 430 480, 410 580 L 190 580 C 170 480, 150 320, 180 200 Z" fill="#ffffff" />
+
+    <!-- Shoulder / Armhole Contour Line -->
+    <path d="M 180 200 C 250 230, 350 230, 420 200" stroke-width="1.5" stroke-dasharray="2 4" opacity="0.6" />
+
+    <!-- Sleeve Hem Stitching Line -->
+    <path d="M 190 550 L 410 550" stroke-width="1.5" stroke-dasharray="3 3" opacity="0.7" />
+
+    <!-- Sleeve Bottom Fold / Hem Outline -->
+    <path d="M 190 580 L 410 580" stroke-width="2" />
+
+    <!-- Printable Design Boundary Box (Hidden by default or used as canvas layer) -->
+    <rect x="230" y="300" width="140" height="180" rx="6" fill="none" stroke="#a1a1aa" stroke-width="1" stroke-dasharray="4 4" opacity="0.5" />
+  </g>
+</svg>

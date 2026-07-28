@@ -1,0 +1,7 @@
+@import "tailwindcss";
+
+/* Apply this class to a semi-transparent shadow graphic placed directly over your Fabric canvas */
+.wrinkle-overlay {
+  mix-blend-mode: multiply;
+  pointer-events: none; /* Allows user to drag canvas items underneath the overlay safely */
+}

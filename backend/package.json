@@ -1,0 +1,52 @@
+{
+  "name": "mojilo-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Enterprise-grade backend for Mojilo e-commerce platform",
+  "main": "server.js",
+  "scripts": {
+    "start": "cross-env NODE_OPTIONS=--dns-result-order=ipv4first node server.js",
+    "dev": "cross-env NODE_OPTIONS=--dns-result-order=ipv4first nodemon server.js",
+    "seed:admin": "cross-env NODE_OPTIONS=--dns-result-order=ipv4first node seeder.js",
+    "check:users": "cross-env NODE_OPTIONS=--dns-result-order=ipv4first node checkUsers.js"
+  },
+  "keywords": [
+    "ecommerce",
+    "backend",
+    "nodejs",
+    "express",
+    "mongodb"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@imgly/background-removal-node": "^1.4.5",
+    "adm-zip": "^0.6.0",
+    "bcryptjs": "^2.4.3",
+    "bullmq": "^5.80.6",
+    "cloudinary": "^1.41.0",
+    "compression": "^1.8.1",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-mongo-sanitize": "^2.2.0",
+    "express-rate-limit": "^7.1.5",
+    "express-validator": "^7.3.2",
+    "helmet": "^7.0.0",
+    "ioredis": "^5.11.1",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^7.5.3",
+    "morgan": "^1.11.0",
+    "multer": "^1.4.5-lts.1",
+    "nodemailer": "^9.0.3",
+    "pdfkit": "^0.19.1",
+    "razorpay": "^2.9.6",
+    "socket.io": "^4.8.3",
+    "xss-clean": "^0.1.4"
+  },
+  "devDependencies": {
+    "cross-env": "^10.1.0",
+    "nodemon": "^3.0.1"
+  }
+}
