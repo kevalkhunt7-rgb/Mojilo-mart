@@ -54,7 +54,7 @@ app.use(helmet());
 app.use(cors({
   origin: [
     'http://localhost:5173',
-    'https://mojilo.vercel.app',
+    'https://mojilo-mart.vercel.app',
     'http://localhost:5176'
   ],
   credentials: true
