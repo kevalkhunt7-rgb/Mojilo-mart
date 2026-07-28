@@ -1,33 +1,53 @@
 import CustomCart from '../models/customCart.js';
 import Customization from '../models/Customization.js';
 import Layer from '../models/Layer.js';
+import ApparelTemplate from '../models/ApparelTemplate.js';
 import pricingService from './pricingService.js';
 import ApiError from '../utils/ApiError.js';
 
 const TEMPLATE_BASE_PRICES = {
-  'half_sleeve_t_shirt': 19.99,
-  'long_sleeve_t_shirt': 24.99,
-  'oversized_t_shirt': 22.99,
-  'hoodie': 39.99,
-  'sports_jersey': 29.99
+  'half_sleeve_t_shirt': 299,
+  'long_sleeve_t_shirt': 399,
+  'oversized_t_shirt': 449,
+  'hoodie': 699,
+  'sports_jersey': 499,
+  'half-sleeve': 299,
+  'long-sleeve': 399,
+  'oversized': 449,
+  'sports-jersey': 499,
 };
 
 const cleanKey = (str) => String(str || '').toLowerCase().replace(/[\s_-]/g, '');
 
 class CustomCartService {
   /**
-   * Helper utility to normalize tracking keys and match TEMPLATE_BASE_PRICES
+   * Helper utility to look up template base price from DB or fallback dictionary
    */
-  getTemplatePrice(clothingType) {
+  async getTemplatePrice(clothingType) {
+    if (!clothingType) return 499;
     const cleaned = cleanKey(clothingType);
+
+    try {
+      const dbTemplate = await ApparelTemplate.findOne({
+        $or: [
+          { key: clothingType },
+          { key: clothingType.replace(/_/g, '-') },
+          { key: clothingType.replace(/-/g, '_') },
+          { name: new RegExp('^' + clothingType.replace(/[\s_-]+/g, '.*') + '$', 'i') }
+        ]
+      }).lean();
+
+      if (dbTemplate && typeof dbTemplate.basePrice === 'number' && dbTemplate.basePrice > 0) {
+        return dbTemplate.basePrice;
+      }
+    } catch (err) {
+      console.warn('[CustomCartService] Could not query ApparelTemplate basePrice:', err.message);
+    }
+
     const matchKey = Object.keys(TEMPLATE_BASE_PRICES).find(
       k => cleanKey(k) === cleaned
     );
-    if (!matchKey) {
-      // Default fallback
-      return 19.99;
-    }
-    return TEMPLATE_BASE_PRICES[matchKey];
+    return matchKey ? TEMPLATE_BASE_PRICES[matchKey] : 499;
   }
 
   /**
@@ -89,7 +109,7 @@ class CustomCartService {
       item.color === color
     );
 
-    const basePrice = this.getTemplatePrice(clothingType);
+    const basePrice = await this.getTemplatePrice(clothingType);
 
     if (existingIndex > -1) {
       cart.items[existingIndex].quantity += Number(quantity);
@@ -148,7 +168,7 @@ class CustomCartService {
         customization.layers = await Layer.find({ customizationId: item.customizationId });
       }
 
-      const basePrice = this.getTemplatePrice(item.clothingType);
+      const basePrice = await this.getTemplatePrice(item.clothingType);
       
       const variant = {
         price: basePrice,

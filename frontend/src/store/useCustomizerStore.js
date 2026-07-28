@@ -1,11 +1,11 @@
 import { create } from "zustand";
 
 const BASE_PRICES = {
-  "half-sleeve": 19.99,
-  "long-sleeve": 24.99,
-  "oversized": 22.99,
-  "hoodie": 39.99,
-  "sports-jersey": 29.99,
+  "half-sleeve": 299,
+  "long-sleeve": 399,
+  "oversized": 449,
+  "hoodie": 699,
+  "sports-jersey": 499,
 };
 
 export const useCustomizerStore = create((set, get) => ({
@@ -33,13 +33,13 @@ export const useCustomizerStore = create((set, get) => ({
 
   // Live pricing details
   pricingDetails: {
-    base: 19.99,
+    base: 299,
     text: 0.0,
     image: 0.0,
     ai: 0.0,
     area: 0.0,
     extra: 0.0,
-    total: 19.99,
+    total: 299,
   },
 
   // Undo/Redo stacks

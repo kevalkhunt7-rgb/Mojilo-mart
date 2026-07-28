@@ -92,7 +92,7 @@ export default function PriceCalculator() {
         {/* Total Price Row */}
         <div className="flex items-center justify-between border-t border-slate-100 pt-3 mt-3">
           <span className="text-sm font-bold text-slate-900">Total Price</span>
-          <span className="text-base font-extrabold text-violet-600">₹{totalCost.toFixed(2)}</span>
+          <span className="text-base font-extrabold text-[#997241]">₹{totalCost.toFixed(2)}</span>
         </div>
       </div>
 

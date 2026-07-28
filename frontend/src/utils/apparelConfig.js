@@ -19,7 +19,7 @@ export const apparelConfig = {
     id: 'half-sleeve',
     name: 'Half Sleeve T-Shirt',
     modelComponent: TshirtModel,
-    basePrice: 19.99,
+    basePrice: 299,
     supportedViews: ['front', 'back'],
     printAreas: {
       front: { width: 600, height: 900, label: "Front Print Area (12\" x 18\")" },
@@ -30,7 +30,7 @@ export const apparelConfig = {
     id: 'long-sleeve',
     name: 'Long Sleeve T-Shirt',
     modelComponent: LongSleeveModel, 
-    basePrice: 24.99,
+    basePrice: 399,
     supportedViews: ['front', 'back'],
     printAreas: {
       front: { width: 600, height: 900, label: "Front Print Area (12\" x 18\")" },
@@ -41,7 +41,7 @@ export const apparelConfig = {
     id: 'oversized',
     name: 'Oversized T-Shirt',
     modelComponent: OversizedModel, 
-    basePrice: 22.99,
+    basePrice: 449,
     supportedViews: ['front', 'back'],
     printAreas: {
       front: { width: 700, height: 900, label: "Front Print Area (14\" x 18\")" },
@@ -52,7 +52,7 @@ export const apparelConfig = {
     id: 'hoodie',
     name: 'Hoodie',
     modelComponent: HoodieModel, 
-    basePrice: 39.99,
+    basePrice: 699,
     supportedViews: ['front', 'back'],
     printAreas: {
       front:  { width: 600, height: 900, label: "Front Print Area (12\" x 18\")" },
@@ -65,7 +65,7 @@ export const apparelConfig = {
     id: 'sports-jersey',
     name: 'Sports Jersey',
     modelComponent: SportsJerseyModel, 
-    basePrice: 29.99,
+    basePrice: 499,
     supportedViews: ['front', 'back', 'left', 'right'],
     printAreas: {
       front: { width: 600, height: 900, label: "Front Print Area (12\" x 18\")" },

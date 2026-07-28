@@ -16,6 +16,23 @@ const labelClass = 'block text-[10px] font-bold uppercase tracking-wider text-sl
 
 const getItemPrice = (item) => {
   if (!item) return 0;
+
+  // 1. Custom template items carry their total calculated unit price in item.price or totalItemPrice
+  if (item.isCustomTemplate || item.customizationId || item.customization) {
+    if (typeof item.price === 'number' && !isNaN(item.price) && item.price > 0) {
+      return item.price;
+    }
+    if (typeof item.totalItemPrice === 'number' && !isNaN(item.totalItemPrice) && item.totalItemPrice > 0) {
+      return item.totalItemPrice / (item.quantity || 1);
+    }
+  }
+
+  // 2. Direct unit price on cart item
+  if (typeof item.price === 'number' && !isNaN(item.price) && item.price > 0) {
+    return item.price;
+  }
+
+  // 3. Standard database product pricing
   const prod = item.product;
   if (prod && typeof prod === 'object') {
     const sale = Number(prod.salePrice);
@@ -25,10 +42,12 @@ const getItemPrice = (item) => {
     const base = Number(prod.basePrice);
     if (!isNaN(base) && base > 0) return base;
   }
+
   const itemSale = Number(item.salePrice);
   if (!isNaN(itemSale) && itemSale > 0) return itemSale;
   const varPrice = Number(item.variant?.price);
   if (!isNaN(varPrice) && varPrice > 0) return varPrice;
+
   return Number(item.price || 0);
 };
 
@@ -466,7 +485,7 @@ const Checkout = () => {
                       </div>
 
                       <div className="text-sm font-bold text-slate-900 whitespace-nowrap flex-shrink-0">
-                        ₹{itemPrice * (item.quantity || 1)}
+                        ₹{(itemPrice * (item.quantity || 1)).toFixed(2)}
                       </div>
                     </div>
                   );
@@ -477,14 +496,14 @@ const Checkout = () => {
             <div className="border-t border-slate-100 pt-4 space-y-3 text-sm font-medium">
               <div className="flex justify-between text-slate-500">
                 <span>Subtotal</span>
-                <span className="text-slate-900 font-semibold">₹{subtotal}</span>
+                <span className="text-slate-900 font-semibold">₹{subtotal.toFixed(2)}</span>
               </div>
               {discountAmount > 0 && (
                 <div className="flex justify-between text-emerald-600 bg-emerald-50/60 px-3 py-2 rounded-xl border border-emerald-100/50">
                   <span className="text-xs font-bold uppercase tracking-wide">
                     Coupon ({appliedCoupon?.code})
                   </span>
-                  <span className="font-bold">−₹{discountAmount}</span>
+                  <span className="font-bold">−₹{discountAmount.toFixed(2)}</span>
                 </div>
               )}
               <div className="flex justify-between text-slate-500">
@@ -493,7 +512,7 @@ const Checkout = () => {
               </div>
               <div className="flex justify-between items-center pt-3 border-t border-slate-100 text-base font-bold text-slate-900">
                 <span>Total</span>
-                <span className="text-xl font-black tracking-tight text-[#a47a4c]">₹{grandTotal}</span>
+                <span className="text-xl font-black tracking-tight text-[#a47a4c]">₹{grandTotal.toFixed(2)}</span>
               </div>
             </div>
 

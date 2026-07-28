@@ -11,9 +11,11 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
+  LayoutGrid ,
   Shirt,
   Palette,
   Maximize2,
+  QrCode,
   Type,
   ImagePlus,
   Wrench,
@@ -46,6 +48,7 @@ import StickersPanel from "../components/StickersPanel";
 import ShapesPanel from "../components/ShapesPanel";
 import ImageUploadPanel from "../components/ImageUploadPanel";
 import BackgroundRemovalPanel from "../components/BackgroundRemovalPanel";
+import { AddToCartLoader } from "../components/AddtoCartLoader";
 
 // Store & Context
 import { useCanvas } from "../context/CanvasContext";
@@ -89,7 +92,99 @@ function useIsMobile(breakpointPx = 1024) {
 // Small, cheap placeholder shown instead of the heavy canvases while
 // they're not the active mobile view — keeps layout stable without
 // paying render cost.
-function PanelSkeleton({ label }) {
+function PanelSkeleton({ label, loading3D }) {
+  if (loading3D) {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 relative overflow-hidden">
+        {/* Background shimmer sweep */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div
+            className="absolute inset-0 opacity-30"
+            style={{
+              background: "linear-gradient(105deg, transparent 40%, rgba(139,92,246,0.15) 50%, transparent 60%)",
+              animation: "skeletonShimmer 2s ease-in-out infinite",
+            }}
+          />
+        </div>
+
+        {/* Pulsing ring stack */}
+        <div className="relative flex items-center justify-center mb-6">
+          <div
+            className="absolute rounded-full border-2 border-violet-400/20"
+            style={{ width: 110, height: 110, animation: "pingRing 2s ease-out infinite" }}
+          />
+          <div
+            className="absolute rounded-full border-2 border-violet-400/30"
+            style={{ width: 80, height: 80, animation: "pingRing 2s ease-out 0.5s infinite" }}
+          />
+          {/* Spinning arc */}
+          <div
+            className="absolute rounded-full"
+            style={{
+              width: 64,
+              height: 64,
+              border: "3px solid transparent",
+              borderTopColor: "#7c3aed",
+              borderRightColor: "#a78bfa",
+              animation: "spinArc 1s linear infinite",
+            }}
+          />
+          {/* 3D box icon */}
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-500/30"
+            style={{ animation: "floatBox 3s ease-in-out infinite" }}
+          >
+            <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
+            </svg>
+          </div>
+        </div>
+
+        {/* Text */}
+        <p className="text-sm font-bold text-slate-700 dark:text-slate-200 mb-1 tracking-wide">
+          Loading 3D Model
+        </p>
+        <p className="text-xs text-slate-400 dark:text-slate-500 font-medium">
+          Preparing your garment…
+        </p>
+
+        {/* Progress dots */}
+        <div className="flex gap-1.5 mt-4">
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="w-1.5 h-1.5 rounded-full bg-violet-400"
+              style={{ animation: `bounceDot 1.2s ease-in-out ${i * 0.2}s infinite` }}
+            />
+          ))}
+        </div>
+
+        {/* Inline keyframes */}
+        <style>{`
+          @keyframes skeletonShimmer {
+            0%   { transform: translateX(-100%); }
+            100% { transform: translateX(200%); }
+          }
+          @keyframes pingRing {
+            0%   { transform: scale(0.8); opacity: 0.7; }
+            80%  { transform: scale(1.2); opacity: 0; }
+            100% { transform: scale(1.2); opacity: 0; }
+          }
+          @keyframes spinArc {
+            to { transform: rotate(360deg); }
+          }
+          @keyframes floatBox {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50%       { transform: translateY(-6px) rotate(3deg); }
+          }
+          @keyframes bounceDot {
+            0%, 80%, 100% { transform: scale(0.7); opacity: 0.4; }
+            40%            { transform: scale(1.3); opacity: 1; }
+          }
+        `}</style>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full h-full flex items-center justify-center text-slate-300 dark:text-slate-600 text-xs font-semibold uppercase tracking-widest">
       {label}
@@ -103,11 +198,11 @@ const TOOL_TABS = [
   { id: "apparel", label: "Apparel", icon: <Shirt className="h-5 w-5" /> },
   { id: "upload", label: "Upload Image", icon: <ImagePlus className="h-5 w-5" /> },
   { id: "text", label: "Text", icon: <Type className="h-5 w-5" /> },
-  { id: "graphics", label: "Stickers", icon: <Sparkles className="h-5 w-5" /> },
-  { id: "shapes", label: "Shapes", icon: <Layers className="h-5 w-5" /> },
+  { id: "graphics", label: "Stickers", icon: <LayoutGrid  className="h-5 w-5" /> },
+  // { id: "shapes", label: "Shapes", icon: <Layers className="h-5 w-5" /> },
   { id: "ai", label: "AI Generator", icon: <Sparkles className="h-5 w-5 text-amber-500 fill-amber-500/20" /> },
-  { id: "qr", label: "QR Code", icon: <Maximize2 className="h-5 w-5" /> },
-  { id: "bg-remover", label: "BG Remover", icon: <Wand2 className="h-5 w-5 text-indigo-500 dark:text-indigo-400" /> },
+  { id: "qr", label: "QR Code", icon: <QrCode  className="h-5 w-5" /> },
+  { id: "bg-remover", label: "BG Remover", icon: <Wand2 className="h-5 w-5 " /> },
 ];
 
 // Bottom nav shortcuts shown on mobile (matches the reference design):
@@ -172,7 +267,7 @@ export default function CoustomProductTshirt() {
     const all = cv.getObjects();
     return {
       nameObj: all.find((o) => o.isRosterName === true) || null,
-      numObj:  all.find((o) => o.isRosterNumber === true) || null,
+      numObj: all.find((o) => o.isRosterNumber === true) || null,
     };
   };
 
@@ -191,23 +286,23 @@ export default function CoustomProductTshirt() {
   const ensureRosterObjectsForCanvas = (cv, nameVal, numVal, view = "back") => {
     if (!cv || typeof cv.getObjects !== "function") return { nameObj: null, numObj: null };
     let { nameObj, numObj } = getRosterObjects(cv);
-    const cx = cv.width  ? cv.width  / 2 : 150;
+    const cx = cv.width ? cv.width / 2 : 150;
     const cy = cv.height ? cv.height / 2 : 200;
 
     const trimmedName = (nameVal || "").trim().toUpperCase();
-    const trimmedNum  = (numVal  || "").trim();
+    const trimmedNum = (numVal || "").trim();
 
     // ── Handle Name Object (Optional field: if blank, remove/don't display) ──
     if (trimmedName) {
       if (!nameObj) {
         nameObj = new fabric.IText(trimmedName, {
-          left:       cx,
-          top:        trimmedNum ? cy - 45 : cy,
-          originX:    "center",
-          originY:    "center",
+          left: cx,
+          top: trimmedNum ? cy - 45 : cy,
+          originX: "center",
+          originY: "center",
           fontFamily: "Impact",
-          fontSize:   28,
-          fill:       "#000000",
+          fontSize: 28,
+          fill: "#000000",
           isRosterName: true,
         });
         cv.add(nameObj);
@@ -224,13 +319,13 @@ export default function CoustomProductTshirt() {
     if (trimmedNum) {
       if (!numObj) {
         numObj = new fabric.IText(trimmedNum, {
-          left:       cx,
-          top:        trimmedName ? cy + 45 : cy,
-          originX:    "center",
-          originY:    "center",
+          left: cx,
+          top: trimmedName ? cy + 45 : cy,
+          originX: "center",
+          originY: "center",
           fontFamily: "Impact",
-          fontSize:   54,
-          fill:       "#000000",
+          fontSize: 54,
+          fill: "#000000",
           isRosterNumber: true,
         });
         cv.add(numObj);
@@ -251,8 +346,8 @@ export default function CoustomProductTshirt() {
 
   const syncRosterToCanvases = (player, side = rosterPlacementSide) => {
     if (!player) return;
-    const backName  = (player.playerName || "").trim();
-    const backNum   = (player.playerNumber || "").trim();
+    const backName = (player.playerName || "").trim();
+    const backNum = (player.playerNumber || "").trim();
 
     // Independent Front vs Back fields support
     const frontName = (player.frontPlayerName !== undefined && player.frontPlayerName !== null && player.frontPlayerName !== "")
@@ -295,8 +390,8 @@ export default function CoustomProductTshirt() {
     const player = roster[index];
     if (!player) return;
 
-    const backName  = (player.playerName || "").trim();
-    const backNum   = (player.playerNumber || "").trim();
+    const backName = (player.playerName || "").trim();
+    const backNum = (player.playerNumber || "").trim();
     const frontName = (player.frontPlayerName !== undefined && player.frontPlayerName !== null && player.frontPlayerName !== "")
       ? player.frontPlayerName.trim()
       : backName;
@@ -345,6 +440,12 @@ export default function CoustomProductTshirt() {
   const [activeTab, setActiveTab] = useState("apparel");
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
   const [addingToCart, setAddingToCart] = useState(false);
+  const [cartLoaderState, setCartLoaderState] = useState({
+    isLoading: false,
+    isSuccess: false,
+    isError: false,
+    message: "",
+  });
   const [dbProduct, setDbProduct] = useState(null);
   const { addCustomTemplateToCart } = useCart();
 
@@ -406,7 +507,7 @@ export default function CoustomProductTshirt() {
     views.forEach((v) => {
       try {
         localStorage.removeItem(`tshirt-designer-${v}`);
-      } catch (e) {}
+      } catch (e) { }
     });
   };
 
@@ -705,70 +806,76 @@ export default function CoustomProductTshirt() {
     fetchDbProduct();
   }, [currentProduct]);
 
-// Convert a temporary blob: URL into a permanent base64 Data URL so it
-// survives being saved to the DB and viewed in the Admin Panel later.
-const ensurePermanentUrl = async (url) => {
-  if (!url || !url.startsWith("blob:")) return url;
-  try {
-    const response = await fetch(url);
-    const blob = await response.blob();
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  } catch (err) {
-    console.error("Failed to convert blob URL to Base64 Data URL:", err);
-    return url; // Return original as last resort
-  }
-};
+  // Convert a temporary blob: URL into a permanent base64 Data URL so it
+  // survives being saved to the DB and viewed in the Admin Panel later.
+  const ensurePermanentUrl = async (url) => {
+    if (!url || !url.startsWith("blob:")) return url;
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (err) {
+      console.error("Failed to convert blob URL to Base64 Data URL:", err);
+      return url; // Return original as last resort
+    }
+  };
 
-// Helper to generate a blank 600x800 canvas Data URL with the selected shirt background color
-const createBlankCanvasDataUrl = (color = "#FFFFFF", width = 600, height = 800) => {
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext("2d");
-  ctx.fillStyle = color || "#FFFFFF";
-  ctx.fillRect(0, 0, width, height);
-  return canvas.toDataURL("image/png");
-};
+  // Helper to generate a blank 600x800 canvas Data URL with the selected shirt background color
+  const createBlankCanvasDataUrl = (color = "#FFFFFF", width = 600, height = 800) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = color || "#FFFFFF";
+    ctx.fillRect(0, 0, width, height);
+    return canvas.toDataURL("image/png");
+  };
 
-// Helper to export a view canvas as a clean Data URL (data:image/png;...)
-// Uses multiplier: 1.0 (screen resolution) to keep payload size manageable.
-const exportCanvasViewDataUrl = (cv, backgroundColor = "#FFFFFF", width = 600, height = 800) => {
-  if (!cv) {
-    return null; // Return null for missing canvases — blank fallback only when needed
-  }
-
-  try {
-    // 1. Force renderAll() to capture post-background-removal image states & latest edits
-    if (cv.renderAll) {
-      cv.renderAll();
+  // Helper to export a view canvas as a clean Data URL (data:image/png;...)
+  // Uses multiplier: 1.0 (screen resolution) to keep payload size manageable.
+  const exportCanvasViewDataUrl = (cv, backgroundColor = "#FFFFFF", width = 600, height = 800) => {
+    if (!cv) {
+      return null; // Return null for missing canvases — blank fallback only when needed
     }
 
-    // 2. Export canvas Data URL with guides hidden at 1x resolution to reduce payload
-    let dataUrl = withGuidesHidden(cv, () =>
-      cv.toDataURL({ format: "png", quality: 0.85, multiplier: 1.0 })
-    );
+    try {
+      // 1. Force renderAll() to capture post-background-removal image states & latest edits
+      if (cv.renderAll) {
+        cv.renderAll();
+      }
 
-    // 3. Ensure dataUrl is a valid data:image/ string
-    if (!dataUrl || typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/")) {
+      // 2. Export canvas Data URL with guides hidden at 1x resolution to reduce payload
+      let dataUrl = withGuidesHidden(cv, () =>
+        cv.toDataURL({ format: "png", quality: 0.85, multiplier: 1.0 })
+      );
+
+      // 3. Ensure dataUrl is a valid data:image/ string
+      if (!dataUrl || typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/")) {
+        return null;
+      }
+
+      return dataUrl;
+    } catch (err) {
+      console.warn("Failed to export canvas view Data URL:", err);
       return null;
     }
-
-    return dataUrl;
-  } catch (err) {
-    console.warn("Failed to export canvas view Data URL:", err);
-    return null;
-  }
-};
+  };
 
   // Add customized product to cart
   const handleAddToCart = async () => {
     if (addingToCart) return;
     setAddingToCart(true);
+    setCartLoaderState({
+      isLoading: true,
+      isSuccess: false,
+      isError: false,
+      message: "Preparing your custom design...",
+    });
 
     try {
       // 1. Build the design snapshot JSON from all canvas views
@@ -909,6 +1016,12 @@ const exportCanvasViewDataUrl = (cv, backgroundColor = "#FFFFFF", width = 600, h
           .filter((r) => r.playerName !== "" || r.playerNumber !== "");
 
         if (cleanedRoster.length === 0) {
+          setCartLoaderState({
+            isLoading: false,
+            isSuccess: false,
+            isError: true,
+            message: "Please add at least one player name or number to your roster before adding to cart.",
+          });
           toast.error("Please add at least one player name or number to your roster before adding to cart.");
           setAddingToCart(false);
           return;
@@ -951,9 +1064,21 @@ const exportCanvasViewDataUrl = (cv, backgroundColor = "#FFFFFF", width = 600, h
       );
 
       // 7. Navigate to cart page
-      navigate("/cart");
+      setCartLoaderState({
+        isLoading: false,
+        isSuccess: true,
+        isError: false,
+        message: "Added to Cart!",
+      });
+      window.setTimeout(() => navigate("/cart"), 1200);
     } catch (err) {
       console.error("Failed to add customized product to cart:", err);
+      setCartLoaderState({
+        isLoading: false,
+        isSuccess: false,
+        isError: true,
+        message: err.message || "Failed to add to cart. Please try again.",
+      });
       toast.error(err.message || "Failed to add to cart. Please try again.");
     } finally {
       setAddingToCart(false);
@@ -967,12 +1092,12 @@ const exportCanvasViewDataUrl = (cv, backgroundColor = "#FFFFFF", width = 600, h
   ];
   const FALLBACK_SIZES = [
     { size: "XS", enabled: true, priceAddon: 0 },
-    { size: "S",  enabled: true, priceAddon: 0 },
-    { size: "M",  enabled: true, priceAddon: 0 },
-    { size: "L",  enabled: true, priceAddon: 0 },
+    { size: "S", enabled: true, priceAddon: 0 },
+    { size: "M", enabled: true, priceAddon: 0 },
+    { size: "L", enabled: true, priceAddon: 0 },
     { size: "XL", enabled: true, priceAddon: 0 },
-    { size: "XXL",enabled: true, priceAddon: 0 },
-    { size: "3XL",enabled: false,priceAddon: 0 },
+    { size: "XXL", enabled: true, priceAddon: 0 },
+    { size: "3XL", enabled: false, priceAddon: 0 },
   ];
 
   const liveTemplate = apparelTemplates?.[currentProduct] ?? null;
@@ -1019,7 +1144,7 @@ const exportCanvasViewDataUrl = (cv, backgroundColor = "#FFFFFF", width = 600, h
                   key={color}
                   onClick={() => setProductColor(color)}
                   className={`w-7 h-7 rounded-full border shadow-inner transition-all hover:scale-110 cursor-pointer ${productColor === color
-                    ? "border-violet-600 ring-2 ring-violet-200 dark:ring-violet-900"
+                    ? "border-[#997241] ring-2 ring-[#997241] dark:ring-[#997241]"
                     : "border-slate-200 dark:border-slate-600"
                     }`}
                   style={{ backgroundColor: color }}
@@ -1034,7 +1159,7 @@ const exportCanvasViewDataUrl = (cv, backgroundColor = "#FFFFFF", width = 600, h
             <div className="flex flex-wrap gap-1.5">
               {tshirtSizes.map((sz) => {
                 // sz is either { size, enabled, priceAddon } (live) or a plain string (fallback)
-                const sizeLabel  = typeof sz === "string" ? sz : sz.size;
+                const sizeLabel = typeof sz === "string" ? sz : sz.size;
                 const priceAddon = typeof sz === "object" ? (sz.priceAddon ?? 0) : 0;
                 const isSelected = productSize === sizeLabel;
                 return (
@@ -1042,11 +1167,10 @@ const exportCanvasViewDataUrl = (cv, backgroundColor = "#FFFFFF", width = 600, h
                     key={sizeLabel}
                     onClick={() => setProductSize(sizeLabel)}
                     title={priceAddon > 0 ? `+₹${priceAddon} for ${sizeLabel}` : sizeLabel}
-                    className={`relative w-9 h-8 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
-                      isSelected
+                    className={`relative w-9 h-8 rounded-lg text-xs font-bold transition-all border cursor-pointer ${isSelected
                         ? "bg-slate-900 border-slate-900 text-white dark:bg-white dark:text-slate-900 dark:border-white"
                         : "bg-white border-slate-200 dark:bg-slate-700 dark:border-slate-600 text-slate-600 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-600"
-                    }`}
+                      }`}
                   >
                     {sizeLabel}
                     {priceAddon > 0 && (
@@ -1060,32 +1184,7 @@ const exportCanvasViewDataUrl = (cv, backgroundColor = "#FFFFFF", width = 600, h
             </div>
           </div>
 
-          {/* Sports Jersey specific inputs panel */}
-          {currentProduct === "sports-jersey" && (
-            <div className="p-3 bg-violet-50/50 dark:bg-violet-950/20 border border-violet-100 dark:border-violet-900 rounded-xl space-y-3.5">
-              <div className="text-xs font-bold text-violet-700 dark:text-violet-400 uppercase tracking-wider">Jersey Custom Details</div>
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-slate-400 uppercase">Player Name</label>
-                <input
-                  type="text"
-                  value={jerseyPlayerName}
-                  onChange={(e) => setJerseyPlayerName(e.target.value)}
-                  placeholder="M. JORDAN"
-                  className="w-full h-8 px-2.5 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 focus:border-violet-400 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-slate-400 uppercase">Player Number</label>
-                <input
-                  type="text"
-                  value={jerseyPlayerNumber}
-                  onChange={(e) => setJerseyPlayerNumber(e.target.value.slice(0, 2))}
-                  placeholder="23"
-                  className="w-full h-8 px-2.5 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 focus:border-violet-400 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none"
-                />
-              </div>
-            </div>
-          )}
+
 
           {/* --- TEAM ROSTER / BULK ORDER SECTION --- */}
           <div className="p-3.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl space-y-3">
@@ -1104,7 +1203,7 @@ const exportCanvasViewDataUrl = (cv, backgroundColor = "#FFFFFF", width = 600, h
                   onChange={(e) => setIsBulkRoster(e.target.checked)}
                   className="sr-only peer"
                 />
-                <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:after:border-slate-600 peer-checked:bg-indigo-600"></div>
+                <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:after:border-slate-600 peer-checked:bg-[#997241]"></div>
               </label>
             </div>
 
@@ -1140,15 +1239,14 @@ const exportCanvasViewDataUrl = (cv, backgroundColor = "#FFFFFF", width = 600, h
                     <button
                       type="button"
                       onClick={() => handleSetRosterSide("back")}
-                      className={`py-1 px-2 text-[10px] font-bold rounded transition-all cursor-pointer ${
-                        rosterPlacementSide === "back"
+                      className={`py-1 px-2 text-[10px] font-bold rounded transition-all cursor-pointer ${rosterPlacementSide === "back"
                           ? "bg-indigo-600 text-white shadow-xs"
                           : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
-                      }`}
+                        }`}
                     >
                       Back Side
                     </button>
-                    
+
                   </div>
                 </div>
 
@@ -1159,11 +1257,10 @@ const exportCanvasViewDataUrl = (cv, backgroundColor = "#FFFFFF", width = 600, h
                     return (
                       <div
                         key={idx}
-                        className={`p-2.5 rounded-lg space-y-2 text-xs relative group shadow-sm transition-all border ${
-                          isPreviewing
+                        className={`p-2.5 rounded-lg space-y-2 text-xs relative group shadow-sm transition-all border ${isPreviewing
                             ? "bg-indigo-50/60 dark:bg-indigo-950/40 border-indigo-400 dark:border-indigo-600 ring-1 ring-indigo-300 dark:ring-indigo-800"
                             : "bg-white dark:bg-slate-700/60 border-slate-200 dark:border-slate-600"
-                        }`}
+                          }`}
                       >
                         <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase">
                           <span className="flex items-center gap-1.5">
@@ -1178,11 +1275,10 @@ const exportCanvasViewDataUrl = (cv, backgroundColor = "#FFFFFF", width = 600, h
                             <button
                               type="button"
                               onClick={() => handlePreviewPlayer(idx)}
-                              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
-                                isPreviewing
+                              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${isPreviewing
                                   ? "bg-indigo-600 text-white shadow-sm"
                                   : "bg-slate-100 hover:bg-indigo-50 dark:bg-slate-800 dark:hover:bg-indigo-950 text-slate-600 dark:text-slate-300 hover:text-indigo-600"
-                              }`}
+                                }`}
                               title="Preview on 3D/2D garment & edit position"
                             >
                               <Eye className="h-3 w-3" />
@@ -1201,17 +1297,78 @@ const exportCanvasViewDataUrl = (cv, backgroundColor = "#FFFFFF", width = 600, h
                           </div>
                         </div>
 
-                      {rosterPlacementSide === "both" ? (
-                        <div className="space-y-1.5">
-                          {/* Back Side Row */}
-                          <div className="grid grid-cols-12 gap-1.5 items-center">
-                            <div className="col-span-2 text-[9px] font-bold text-indigo-600 dark:text-indigo-400 uppercase">Back:</div>
-                            <div className="col-span-4">
+                        {rosterPlacementSide === "both" ? (
+                          <div className="space-y-1.5">
+                            {/* Back Side Row */}
+                            <div className="grid grid-cols-12 gap-1.5 items-center">
+                              <div className="col-span-2 text-[9px] font-bold text-indigo-600 dark:text-indigo-400 uppercase">Back:</div>
+                              <div className="col-span-4">
+                                <input
+                                  type="text"
+                                  placeholder="Back Name (Opt)"
+                                  value={player.playerName || ""}
+                                  onChange={(e) => handleUpdateRosterRow(idx, "playerName", e.target.value)}
+                                  className="w-full h-7 px-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-medium focus:border-indigo-500 outline-none text-slate-800 dark:text-slate-100"
+                                />
+                              </div>
+                              <div className="col-span-3">
+                                <input
+                                  type="text"
+                                  placeholder="No. (#)"
+                                  value={player.playerNumber || ""}
+                                  onChange={(e) => handleUpdateRosterRow(idx, "playerNumber", e.target.value.slice(0, 3))}
+                                  className="w-full h-7 px-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-mono font-bold focus:border-indigo-500 outline-none text-slate-800 dark:text-slate-100"
+                                />
+                              </div>
+                              <div className="col-span-3">
+                                <select
+                                  value={player.size || productSize || "M"}
+                                  onChange={(e) => handleUpdateRosterRow(idx, "size", e.target.value)}
+                                  className="w-full h-7 px-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-bold focus:border-indigo-500 outline-none text-slate-800 dark:text-slate-100"
+                                >
+                                  {(tshirtSizes.length > 0 ? tshirtSizes : ["S", "M", "L", "XL", "XXL", "3XL"]).map((s) => {
+                                    const label = typeof s === "string" ? s : s.size;
+                                    return (
+                                      <option key={label} value={label}>
+                                        {label}
+                                      </option>
+                                    );
+                                  })}
+                                </select>
+                              </div>
+                            </div>
+
+                            {/* Front Side Row */}
+                            <div className="grid grid-cols-12 gap-1.5 items-center">
+                              <div className="col-span-2 text-[9px] font-bold text-indigo-600 dark:text-indigo-400 uppercase">Front:</div>
+                              <div className="col-span-5">
+                                <input
+                                  type="text"
+                                  placeholder="Front Name (Opt)"
+                                  value={player.frontPlayerName ?? ""}
+                                  onChange={(e) => handleUpdateRosterRow(idx, "frontPlayerName", e.target.value)}
+                                  className="w-full h-7 px-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-medium focus:border-indigo-500 outline-none text-slate-800 dark:text-slate-100"
+                                />
+                              </div>
+                              <div className="col-span-5">
+                                <input
+                                  type="text"
+                                  placeholder="Front No. (#) (Opt)"
+                                  value={player.frontPlayerNumber ?? ""}
+                                  onChange={(e) => handleUpdateRosterRow(idx, "frontPlayerNumber", e.target.value.slice(0, 3))}
+                                  className="w-full h-7 px-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-mono font-bold focus:border-indigo-500 outline-none text-slate-800 dark:text-slate-100"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-12 gap-1.5">
+                            <div className="col-span-5">
                               <input
                                 type="text"
-                                placeholder="Back Name (Opt)"
-                                value={player.playerName || ""}
-                                onChange={(e) => handleUpdateRosterRow(idx, "playerName", e.target.value)}
+                                placeholder={rosterPlacementSide === "front" ? "Front Name (Opt)" : "Back Name (Opt)"}
+                                value={rosterPlacementSide === "front" ? (player.frontPlayerName ?? player.playerName ?? "") : (player.playerName ?? "")}
+                                onChange={(e) => handleUpdateRosterRow(idx, rosterPlacementSide === "front" ? "frontPlayerName" : "playerName", e.target.value)}
                                 className="w-full h-7 px-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-medium focus:border-indigo-500 outline-none text-slate-800 dark:text-slate-100"
                               />
                             </div>
@@ -1219,12 +1376,12 @@ const exportCanvasViewDataUrl = (cv, backgroundColor = "#FFFFFF", width = 600, h
                               <input
                                 type="text"
                                 placeholder="No. (#)"
-                                value={player.playerNumber || ""}
-                                onChange={(e) => handleUpdateRosterRow(idx, "playerNumber", e.target.value.slice(0, 3))}
+                                value={rosterPlacementSide === "front" ? (player.frontPlayerNumber ?? player.playerNumber ?? "") : (player.playerNumber ?? "")}
+                                onChange={(e) => handleUpdateRosterRow(idx, rosterPlacementSide === "front" ? "frontPlayerNumber" : "playerNumber", e.target.value.slice(0, 3))}
                                 className="w-full h-7 px-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-mono font-bold focus:border-indigo-500 outline-none text-slate-800 dark:text-slate-100"
                               />
                             </div>
-                            <div className="col-span-3">
+                            <div className="col-span-4">
                               <select
                                 value={player.size || productSize || "M"}
                                 onChange={(e) => handleUpdateRosterRow(idx, "size", e.target.value)}
@@ -1241,71 +1398,10 @@ const exportCanvasViewDataUrl = (cv, backgroundColor = "#FFFFFF", width = 600, h
                               </select>
                             </div>
                           </div>
-
-                          {/* Front Side Row */}
-                          <div className="grid grid-cols-12 gap-1.5 items-center">
-                            <div className="col-span-2 text-[9px] font-bold text-indigo-600 dark:text-indigo-400 uppercase">Front:</div>
-                            <div className="col-span-5">
-                              <input
-                                type="text"
-                                placeholder="Front Name (Opt)"
-                                value={player.frontPlayerName ?? ""}
-                                onChange={(e) => handleUpdateRosterRow(idx, "frontPlayerName", e.target.value)}
-                                className="w-full h-7 px-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-medium focus:border-indigo-500 outline-none text-slate-800 dark:text-slate-100"
-                              />
-                            </div>
-                            <div className="col-span-5">
-                              <input
-                                type="text"
-                                placeholder="Front No. (#) (Opt)"
-                                value={player.frontPlayerNumber ?? ""}
-                                onChange={(e) => handleUpdateRosterRow(idx, "frontPlayerNumber", e.target.value.slice(0, 3))}
-                                className="w-full h-7 px-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-mono font-bold focus:border-indigo-500 outline-none text-slate-800 dark:text-slate-100"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-12 gap-1.5">
-                          <div className="col-span-5">
-                            <input
-                              type="text"
-                              placeholder={rosterPlacementSide === "front" ? "Front Name (Opt)" : "Back Name (Opt)"}
-                              value={rosterPlacementSide === "front" ? (player.frontPlayerName ?? player.playerName ?? "") : (player.playerName ?? "")}
-                              onChange={(e) => handleUpdateRosterRow(idx, rosterPlacementSide === "front" ? "frontPlayerName" : "playerName", e.target.value)}
-                              className="w-full h-7 px-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-medium focus:border-indigo-500 outline-none text-slate-800 dark:text-slate-100"
-                            />
-                          </div>
-                          <div className="col-span-3">
-                            <input
-                              type="text"
-                              placeholder="No. (#)"
-                              value={rosterPlacementSide === "front" ? (player.frontPlayerNumber ?? player.playerNumber ?? "") : (player.playerNumber ?? "")}
-                              onChange={(e) => handleUpdateRosterRow(idx, rosterPlacementSide === "front" ? "frontPlayerNumber" : "playerNumber", e.target.value.slice(0, 3))}
-                              className="w-full h-7 px-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-mono font-bold focus:border-indigo-500 outline-none text-slate-800 dark:text-slate-100"
-                            />
-                          </div>
-                          <div className="col-span-4">
-                            <select
-                              value={player.size || productSize || "M"}
-                              onChange={(e) => handleUpdateRosterRow(idx, "size", e.target.value)}
-                              className="w-full h-7 px-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-bold focus:border-indigo-500 outline-none text-slate-800 dark:text-slate-100"
-                            >
-                              {(tshirtSizes.length > 0 ? tshirtSizes : ["S", "M", "L", "XL", "XXL", "3XL"]).map((s) => {
-                                const label = typeof s === "string" ? s : s.size;
-                                return (
-                                  <option key={label} value={label}>
-                                    {label}
-                                  </option>
-                                );
-                              })}
-                            </select>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
 
                 <button
@@ -1439,8 +1535,8 @@ const exportCanvasViewDataUrl = (cv, backgroundColor = "#FFFFFF", width = 600, h
                 }}
                 title={tab.label}
                 className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all cursor-pointer shrink-0 ${activeTab === tab.id && leftSidebarOpen
-                  ? "bg-violet-600 text-white shadow-md scale-[1.05]"
-                  : "text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-600 dark:hover:text-slate-200"
+                  ? "bg-[#997241] text-[#FFF] shadow-md scale-[1.05]"
+                  : "text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-600 dark:hover:text-slate-200"
                   }`}
               >
                 {tab.icon}
@@ -1468,10 +1564,10 @@ const exportCanvasViewDataUrl = (cv, backgroundColor = "#FFFFFF", width = 600, h
               <button
                 onClick={handleAddToCart}
                 disabled={addingToCart}
-                className="w-full h-11 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-indigo-100 dark:shadow-none hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full h-11 bg-[#997241] hover:from-violet-700 hover:to-indigo-700 text-white rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-indigo-100 dark:shadow-none hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Shirt className="h-4.5 w-4.5" />
-                {addingToCart ? 'Adding…' : 'Add to Cart & Checkout'}
+                Add to Cart & Checkout
               </button>
             </div>
           </div>
@@ -1497,13 +1593,13 @@ const exportCanvasViewDataUrl = (cv, backgroundColor = "#FFFFFF", width = 600, h
             } flex-1 min-w-0 lg:min-w-[320px] h-full relative z-10 lg:border-r border-slate-200 dark:border-slate-700`}
         >
           <div className="absolute top-4 right-4 z-20 flex gap-2">
-            <span className="text-[11px] font-bold text-indigo-600 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900 px-2 py-0.5 rounded-md uppercase tracking-wider">
+            <span className="text-[11px] font-bold text-[#997241] bg-[#fff] hover:bg-indigo-200 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900 px-2 py-0.5 rounded-md uppercase tracking-wider">
               {productConfig.name}
             </span>
           </div>
 
           {shouldMountPreview ? (
-            <Suspense fallback={<PanelSkeleton label="Loading preview…" />}>
+            <Suspense fallback={<PanelSkeleton loading3D />}>
               <ThreeDViewer
                 modelComponent={ActiveModelMesh}
                 tshirtColor={productColor}
@@ -1576,7 +1672,7 @@ const exportCanvasViewDataUrl = (cv, backgroundColor = "#FFFFFF", width = 600, h
             className="h-11 px-4 shrink-0 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Shirt className="h-4.5 w-4.5" />
-            {addingToCart ? 'Adding…' : 'Add'}
+            Add
           </button>
         </div>
       </div>
@@ -1613,7 +1709,7 @@ const exportCanvasViewDataUrl = (cv, backgroundColor = "#FFFFFF", width = 600, h
               className="w-full h-11 mt-4 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Shirt className="h-4.5 w-4.5" />
-              {addingToCart ? 'Adding…' : 'Add to Cart & Checkout'}
+              Add to Cart & Checkout
             </button>
           </div>
         </div>
@@ -1694,6 +1790,14 @@ const exportCanvasViewDataUrl = (cv, backgroundColor = "#FFFFFF", width = 600, h
           );
         })}
       </nav>
+
+      <AddToCartLoader
+        isLoading={cartLoaderState.isLoading}
+        isSuccess={cartLoaderState.isSuccess}
+        isError={cartLoaderState.isError}
+        message={cartLoaderState.message}
+        onRetry={() => handleAddToCart()}
+      />
     </div>
   );
 }

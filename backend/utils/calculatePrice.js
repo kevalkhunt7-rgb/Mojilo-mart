@@ -31,32 +31,23 @@ export const calculateProductPrice = ({
       layersByView[view].push(layer);
     });
 
-    // Compute bounding box and ink cost per view
+    // Compute ink cost per view from object areas
     Object.values(layersByView).forEach((viewLayers) => {
       if (!viewLayers || viewLayers.length === 0) return;
 
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      let viewAreaPx = 0;
 
       viewLayers.forEach((obj) => {
-        const x = obj.x || 0;
-        const y = obj.y || 0;
         const w = obj.width || 0;
         const h = obj.height || 0;
-
-        minX = Math.min(minX, x);
-        minY = Math.min(minY, y);
-        maxX = Math.max(maxX, x + w);
-        maxY = Math.max(maxY, y + h);
+        viewAreaPx += w * h;
       });
 
-      if (minX !== Infinity) {
-        const widthInches = Math.max(0, maxX - minX) / PX_PER_INCH;
-        const heightInches = Math.max(0, maxY - minY) / PX_PER_INCH;
-        const calculatedAreaCost = widthInches * heightInches * RATE_PER_SQ_INCH;
+      const sqInches = viewAreaPx / (PX_PER_INCH * PX_PER_INCH);
+      const calculatedAreaCost = sqInches * RATE_PER_SQ_INCH;
 
-        // Apply ₹30 Minimum Rule for this view
-        areaCost += Math.max(MINIMUM_VIEW_PRINT_COST, calculatedAreaCost);
-      }
+      // Apply ₹30 Minimum Rule for this view
+      areaCost += Math.max(MINIMUM_VIEW_PRINT_COST, calculatedAreaCost);
     });
   }
 

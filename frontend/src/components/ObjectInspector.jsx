@@ -219,7 +219,7 @@ export default function ObjectInspector() {
               />
               <span className="text-[9px] font-medium text-slate-400 ml-1 whitespace-nowrap">px</span>
             </div>
-            <div className="text-[10px] font-bold text-violet-600 text-center tracking-wide">
+            <div className="text-[10px] font-bold text-[#997241] text-center tracking-wide">
               {widthInches}"
             </div>
           </div>
@@ -235,7 +235,7 @@ export default function ObjectInspector() {
               />
               <span className="text-[9px] font-medium text-slate-400 ml-1 whitespace-nowrap">px</span>
             </div>
-            <div className="text-[10px] font-bold text-violet-600 text-center tracking-wide">
+            <div className="text-[10px] font-bold text-[#997241] text-center tracking-wide">
               {heightInches}"
             </div>
           </div>
@@ -243,12 +243,12 @@ export default function ObjectInspector() {
       </div>
 
       {/* Live Print Size Badge */}
-      <div className="flex items-center justify-center gap-2 p-2.5 bg-gradient-to-r from-violet-50 to-indigo-50 border border-violet-200/60 rounded-xl">
-        <Ruler className="h-3.5 w-3.5 text-violet-500" />
-        <span className="text-[11px] font-extrabold text-violet-700 tracking-wide">
+      <div className="flex items-center justify-center gap-2 p-2.5 bg-[#f2ece6] border border-violet-200/60 rounded-xl">
+        <Ruler className="h-3.5 w-3.5 text-[#997241]" />
+        <span className="text-[11px] font-extrabold text-[#997241] tracking-wide">
           {widthInches}" × {heightInches}"
         </span>
-        <span className="text-[9px] font-semibold text-violet-400">
+        <span className="text-[9px] font-semibold text-[#997241]">
           ({areaSqInches} in²)
         </span>
       </div>
@@ -263,7 +263,7 @@ export default function ObjectInspector() {
             max="360"
             value={rotation}
             onChange={(e) => handleRotationChange(e.target.value)}
-            className="w-full accent-violet-600 cursor-pointer"
+            className="w-full accent-[#997241] cursor-pointer"
           />
           <div className="text-[10px] font-semibold text-slate-500 text-right">{rotation}°</div>
         </div>
@@ -276,7 +276,7 @@ export default function ObjectInspector() {
             step="0.05"
             value={opacity}
             onChange={(e) => handleOpacityChange(e.target.value)}
-            className="w-full accent-violet-600 cursor-pointer"
+            className="w-full accent-[#997241] cursor-pointer"
           />
           <div className="text-[10px] font-semibold text-slate-500 text-right">{Math.round(opacity * 100)}%</div>
         </div>

@@ -147,7 +147,7 @@ export const calculatePrice = ({ customization, variant, quantity = 1 }) => {
 
       activeViewsCount++;
 
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      let viewAreaPx = 0;
 
       objects.forEach((obj) => {
         // Classify layer types for extra flat fees if configured
@@ -162,27 +162,17 @@ export const calculatePrice = ({ customization, variant, quantity = 1 }) => {
           }
         }
 
-        // Extend bounding box calculation per side
-        const x = obj.x || 0;
-        const y = obj.y || 0;
         const w = obj.width || 0;
         const h = obj.height || 0;
-
-        minX = Math.min(minX, x);
-        minY = Math.min(minY, y);
-        maxX = Math.max(maxX, x + w);
-        maxY = Math.max(maxY, y + h);
+        viewAreaPx += w * h;
       });
 
       // Calculate total area cost for this side
-      if (minX !== Infinity) {
-        const widthInches  = Math.max(0, maxX - minX) / PX_PER_INCH;
-        const heightInches = Math.max(0, maxY - minY) / PX_PER_INCH;
-        const calculatedAreaCost = widthInches * heightInches * RATE_PER_SQ_INCH;
-        
-        // Enforce the ₹30 Minimum Rule per view
-        areaCost += Math.max(MINIMUM_VIEW_PRINT_COST, calculatedAreaCost);
-      }
+      const sqInches = viewAreaPx / (PX_PER_INCH * PX_PER_INCH);
+      const calculatedAreaCost = sqInches * RATE_PER_SQ_INCH;
+
+      // Enforce the ₹30 Minimum Rule per view
+      areaCost += Math.max(MINIMUM_VIEW_PRINT_COST, calculatedAreaCost);
     });
   }
 

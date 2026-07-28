@@ -5,7 +5,7 @@ import ToolBar from "./ToolBar";
 // 📦 1. CRITICAL IMPORTS: Ensure all sub-panels are imported correctly
 import TypographyPanel from "./TypographyPanel";
 import StickersPanel from "./StickersPanel";
-import ShapesPanel from "./ShapesPanel"; // 👈 Make sure this file exists!
+
 
 export default function ToolsSidebar({ manualSync }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -44,7 +44,7 @@ export default function ToolsSidebar({ manualSync }) {
               manualSync={manualSync} 
               onToggleText={() => toggleSubPanel('text')}
               onToggleStickers={() => toggleSubPanel('stickers')}
-              onToggleShapes={() => toggleSubPanel('shapes')} 
+            
               activeSubPanel={activeSubPanel}
             />
           </div>
@@ -75,7 +75,7 @@ export default function ToolsSidebar({ manualSync }) {
           <div className="flex-1 overflow-y-auto p-3">
             {activeSubPanel === 'text' && <TypographyPanel />}
             {activeSubPanel === 'stickers' && <StickersPanel manualSync={manualSync} />}
-            {activeSubPanel === 'shapes' && <ShapesPanel manualSync={manualSync} />}
+      
           </div>
 
         </div>

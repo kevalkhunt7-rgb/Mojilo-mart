@@ -9,13 +9,17 @@ import ApiError from '../utils/ApiError.js';
 import pricingService from './pricingService.js';
 import logger from '../utils/logger.js';
 
-// Predefined base prices for frontend clothing types
+// Predefined base prices for frontend clothing types (INR)
 const TEMPLATE_BASE_PRICES = {
-  'half_sleeve_t_shirt': 19.99,
-  'long_sleeve_t_shirt': 24.99,
-  'oversized_t_shirt': 22.99,
-  'hoodie': 39.99,
-  'sports_jersey': 29.99
+  'half_sleeve_t_shirt': 299,
+  'long_sleeve_t_shirt': 399,
+  'oversized_t_shirt': 449,
+  'hoodie': 699,
+  'sports_jersey': 499,
+  'half-sleeve': 299,
+  'long-sleeve': 399,
+  'oversized': 449,
+  'sports-jersey': 499
 };
 
 // Helper utility to normalize tracking keys (removes spaces, hyphens, and underscores)
