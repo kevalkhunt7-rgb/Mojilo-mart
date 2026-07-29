@@ -15,9 +15,40 @@ export const getMyUploads = asyncHandler(async (req, res) => {
   if (!userId) {
     throw new ApiError(401, 'Authentication required to fetch uploads');
   }
-  // Query new Asset collection for assets
+
   const assets = await Asset.find({ userId }).sort({ createdAt: -1 });
-  res.status(200).json(new ApiResponse(200, assets, 'User design assets retrieved successfully'));
+  const legacyUploads = await UploadedImage.find({ user: userId }).sort({ createdAt: -1 });
+
+  const combined = [
+    ...assets.map((a) => ({
+      _id: a._id,
+      id: a._id,
+      url: a.originalUrl || a.thumbnailUrl || a.processedUrl,
+      originalUrl: a.originalUrl,
+      thumbnailUrl: a.thumbnailUrl,
+      filename: a.originalFileName || 'Uploaded Image',
+      createdAt: a.createdAt,
+    })),
+    ...legacyUploads.map((u) => ({
+      _id: u._id,
+      id: u._id,
+      url: u.imageUrl,
+      imageUrl: u.imageUrl,
+      filename: 'Uploaded Image',
+      createdAt: u.createdAt,
+    })),
+  ];
+
+  // Remove duplicates based on URL
+  const uniqueMap = new Map();
+  combined.forEach((item) => {
+    if (item.url && !uniqueMap.has(item.url)) {
+      uniqueMap.set(item.url, item);
+    }
+  });
+
+  const uniqueUploads = Array.from(uniqueMap.values());
+  res.status(200).json(new ApiResponse(200, uniqueUploads, 'User design assets retrieved successfully'));
 });
 
 export const deleteMyUpload = asyncHandler(async (req, res) => {

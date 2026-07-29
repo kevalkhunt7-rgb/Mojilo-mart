@@ -39,8 +39,8 @@ export default function ImageUploadPanel() {
         if (Array.isArray(uploadsData)) {
           const apiUploads = uploadsData.map((item) => ({
             id: item._id || item.id,
-            thumbnail: item.url || item.imageUrl,
-            name: item.filename || item.name || "Uploaded Image",
+            thumbnail: item.url || item.originalUrl || item.thumbnailUrl || item.processedUrl || item.imageUrl,
+            name: item.filename || item.originalFileName || item.name || "Uploaded Image",
             isPersisted: true,
           }));
           setUploads(apiUploads);
@@ -120,7 +120,13 @@ export default function ImageUploadPanel() {
   };
 
   const handleAddToCanvas = async (dataUrl) => {
-    if (!activeCanvas) return;
+    if (!activeCanvas) {
+    console.error("❌ activeCanvas is NULL");
+    toast.error("Canvas not initialized");
+    return;
+}
+
+console.log("✅ activeCanvas", activeCanvas);
 
     try {
       const imgEl = await loadCorsSafeImage(dataUrl);
