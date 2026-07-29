@@ -14,16 +14,16 @@ export function withGuidesHidden(canvas, captureFn) {
     console.warn("withGuidesHidden: Canvas not available");
     return null;
   }
-  
+
   // Check if canvas is fully initialized
   if (!canvas.getObjects) {
     console.warn("withGuidesHidden: Canvas not fully initialized");
     return null;
   }
-  
+
   const guides = canvas.getObjects().filter((o) => o.excludeFromExport);
   guides.forEach((o) => o.set("visible", false));
-  
+
   try {
     if (canvas.requestRenderAll) {
       canvas.requestRenderAll();
@@ -53,9 +53,9 @@ import sleeveSvg from "../assets/sleeve.svg";
 // Map each product + view combination to the right SVG asset.
 const GARMENT_SVGS = {
   "half-sleeve": { front: tshirtFrontSvg, back: tshirtBackSvg },
-  "long-sleeve": { front: longSleeveFrontSvg, back: longSleeveBackSvg},
-  "hoodie":      { front: hoodieFrontSvg, back: hoodieBackSvg},
-  "oversized":   { front: oversizedFrontSvg, back: oversizedBackSvg },
+  "long-sleeve": { front: longSleeveFrontSvg, back: longSleeveBackSvg },
+  "hoodie": { front: hoodieFrontSvg, back: hoodieBackSvg },
+  "oversized": { front: oversizedFrontSvg, back: oversizedBackSvg },
   "sports-jersey": { front: tshirtFrontSvg, back: tshirtBackSvg, left: sleeveSvg, right: sleeveSvg },
 };
 
@@ -95,7 +95,7 @@ function CanvasRuler({ orientation, length, zoom }) {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
-    
+
     // Support Retina screens
     const ratio = window.devicePixelRatio || 1;
     if (orientation === "horizontal") {
@@ -109,7 +109,7 @@ function CanvasRuler({ orientation, length, zoom }) {
       canvas.style.width = `24px`;
       canvas.style.height = `${length}px`;
     }
-    
+
     ctx.scale(ratio, ratio);
     ctx.clearRect(0, 0, length, 24);
     ctx.strokeStyle = "#94a3b8"; // slate-400
@@ -129,7 +129,7 @@ function CanvasRuler({ orientation, length, zoom }) {
       for (let i = 0; i <= length; i += inchPx / divisions) {
         const isInch = i % inchPx === 0;
         const tickHeight = isInch ? 14 : i % (inchPx / 2) === 0 ? 8 : 4;
-        
+
         ctx.beginPath();
         ctx.moveTo(i, 24 - tickHeight);
         ctx.lineTo(i, 23);
@@ -175,15 +175,15 @@ function SingleCanvasViewport({ view, printArea, manualSync, isSelected, current
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const fabricCanvasRef = useRef(null);
-  const { 
-    setFrontCanvas, 
-    setBackCanvas, 
-    setLeftCanvas, 
-    setRightCanvas, 
-    setPocketCanvas, 
+  const {
+    setFrontCanvas,
+    setBackCanvas,
+    setLeftCanvas,
+    setRightCanvas,
+    setPocketCanvas,
     setHoodCanvas,
-    setActiveCanvas, 
-    setSelectedObject 
+    setActiveCanvas,
+    setSelectedObject
   } = useCanvas();
 
   const gridVisible = useCustomizerStore((state) => state.gridVisible);
@@ -216,7 +216,7 @@ function SingleCanvasViewport({ view, printArea, manualSync, isSelected, current
     boxWidth = boxSize;
     boxHeight = boxSize;
   }
-  
+
   if (process.env.NODE_ENV !== "production") {
     console.debug(
       `[CanvasEditor:${view}] printArea=${printArea.width}x${printArea.height} -> boxWidth=${boxWidth}, boxHeight=${boxHeight} (left:${boxLeft}, top:${boxTop})`
@@ -227,7 +227,7 @@ function SingleCanvasViewport({ view, printArea, manualSync, isSelected, current
     if (!canvasRef.current) return;
 
     if (fabricCanvasRef.current) {
-      try { fabricCanvasRef.current.dispose(); } catch (_) {}
+      try { fabricCanvasRef.current.dispose(); } catch (_) { }
       fabricCanvasRef.current = null;
     }
 
@@ -256,12 +256,12 @@ function SingleCanvasViewport({ view, printArea, manualSync, isSelected, current
       width: boxWidth,
       height: boxHeight,
       fill: "transparent",
-      stroke: "transparent", 
+      stroke: "transparent",
       strokeWidth: 0,
       selectable: false,
       evented: false,
       excludeFromExport: true,
-      visible: false, 
+      visible: false,
     });
 
     canvas.add(printAreaBox);
@@ -275,9 +275,9 @@ function SingleCanvasViewport({ view, printArea, manualSync, isSelected, current
         stateDump[v] = stored ? JSON.parse(stored) : [];
       });
       stateDump[view] = canvas.getObjects().filter(o => o !== printAreaBox).map(o => o.toJSON(["isRosterName", "isRosterNumber"]));
-      
+
       localStorage.setItem(`tshirt-designer-${view}`, JSON.stringify(stateDump[view]));
-      
+
       recalculatePrice(stateDump);
       manualSync?.(view);
     };
@@ -344,7 +344,7 @@ function SingleCanvasViewport({ view, printArea, manualSync, isSelected, current
     const handleObjectMoving = (e) => {
       const obj = e.target;
       if (!obj || obj === printAreaBox) return;
-      
+
       if (obj.type === "activeSelection") {
         obj.getObjects().forEach((subObj) => {
           clampPosition(subObj);
@@ -477,7 +477,7 @@ function SingleCanvasViewport({ view, printArea, manualSync, isSelected, current
     existing.forEach(o => canvas.remove(o));
 
     const guideStyle = {
-      stroke: "#c084fc", 
+      stroke: "#c084fc",
       strokeWidth: 1,
       strokeDashArray: [4, 4],
       selectable: false,
@@ -499,12 +499,12 @@ function SingleCanvasViewport({ view, printArea, manualSync, isSelected, current
   };
 
   return (
-    <div 
+    <div
       ref={containerRef}
       className="relative flex flex-col items-center bg-white rounded-2xl border border-slate-200/80 shadow-sm -mb-[400px] p-4 select-none scrollbar-hide"
     >
       {/* Top Controls Toolbar */}
-      <div className="w-full flex items-center justify-between border-b border-slate-100 pb-3.5 mb-4">
+      <div className="sticky top-0 z-50 w-full flex items-center justify-between border-b border-slate-100 bg-white pb-3.5 mb-4">
         <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
           <Compass className="h-4.5 w-4.5 text-amber-500" />
           {view.toUpperCase()} Workspace
@@ -518,15 +518,15 @@ function SingleCanvasViewport({ view, printArea, manualSync, isSelected, current
       </div>
 
       {/* Grid underlay background */}
-     <div 
-  className="relative overflow-hidden border border-slate-200 rounded-xl"
-  style={{
-    width: `${canvasWidth}px`,
-    height: `${canvasHeight}px`,
-    transform: "scale(0.6)", // Explicitly sets the baseline window view zoom down to 60%
-    transformOrigin: "center top",
-  }}
->
+      <div
+        className="relative overflow-hidden border border-slate-200 rounded-xl"
+        style={{
+          width: `${canvasWidth}px`,
+          height: `${canvasHeight}px`,
+          transform: "scale(0.6)", // Explicitly sets the baseline window view zoom down to 60%
+          transformOrigin: "center top",
+        }}
+      >
         {/* Horizontal Ruler */}
         {rulersVisible && (
           <div className="absolute top-0 left-[24px] right-0 h-[24px] z-20">
@@ -542,10 +542,9 @@ function SingleCanvasViewport({ view, printArea, manualSync, isSelected, current
         )}
 
         {/* Dynamic Grid Dot Background */}
-        <div 
-          className={`absolute inset-0 z-0 pointer-events-none transition-opacity ${
-            gridVisible ? "opacity-100" : "opacity-0"
-          }`}
+        <div
+          className={`absolute inset-0 z-0 pointer-events-none transition-opacity ${gridVisible ? "opacity-100" : "opacity-0"
+            }`}
           style={{
             backgroundImage: "radial-gradient(#cbd5e1 1.2px, transparent 1.2px)",
             backgroundSize: "20px 20px",
@@ -569,7 +568,7 @@ export default function CanvasEditor({ manualSync }) {
   const currentProduct = useCustomizerStore((state) => state.currentProduct);
   const selectedView = useCustomizerStore((state) => state.selectedView);
   const setSelectedView = useCustomizerStore((state) => state.setSelectedView);
-  
+
   const gridVisible = useCustomizerStore((state) => state.gridVisible);
   const setGridVisible = useCustomizerStore((state) => state.setGridVisible);
   const rulersVisible = useCustomizerStore((state) => state.rulersVisible);
@@ -592,10 +591,10 @@ export default function CanvasEditor({ manualSync }) {
 
   return (
     <div className="flex flex-col flex flex-col gap-4 w-full h-full min-h-[500px] gap-4 w-full h-full min-h-[500px]" key={currentProduct}>
-      
-      
+
+
       {/* Aspect Switcher tabs for active product */}
-      
+
 
       {/* Display active view canvas and hide inactive views */}
       <div className="flex-1 w-full overflow-hidden">
@@ -604,15 +603,15 @@ export default function CanvasEditor({ manualSync }) {
           const printArea = productConfig.printAreas[viewKey] || { width: 600, height: 800 };
 
           return (
-            <div 
-              key={`${currentProduct}-${viewKey}`} 
+            <div
+              key={`${currentProduct}-${viewKey}`}
               className={`w-full ${isSelected ? "block animate-in fade-in duration-200" : "hidden"}`}
             >
-              <SingleCanvasViewport 
+              <SingleCanvasViewport
                 key={`${currentProduct}-${viewKey}`}
-                view={viewKey} 
-                printArea={printArea} 
-                manualSync={manualSync} 
+                view={viewKey}
+                printArea={printArea}
+                manualSync={manualSync}
                 isSelected={isSelected}
                 currentProduct={currentProduct}
               />
@@ -620,7 +619,7 @@ export default function CanvasEditor({ manualSync }) {
           );
         })}
       </div>
-      
+
     </div>
   );
 }

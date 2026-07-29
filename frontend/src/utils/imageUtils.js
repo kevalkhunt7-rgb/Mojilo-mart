@@ -12,10 +12,11 @@ export const loadCorsSafeImage = async (rawUrl) => {
   if (rawUrl.startsWith("data:")) {
     return new Promise((resolve, reject) => {
       const img = new Image();
+      img.crossOrigin = "anonymous";
       img.onload = () => resolve(img);
       img.onerror = (e) => reject(new Error("Failed to load Data URL image"));
       img.src = rawUrl;
-    });
+    });         
   }
 
   // Determine proxy URL and API endpoints

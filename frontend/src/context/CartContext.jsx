@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import api from '../lib/axios';
 
@@ -6,6 +7,7 @@ const CartContext = createContext();
 
 export const CartProvider = ({ children }) => {
   const { user, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
   const [cart, setCart] = useState([]);
   const [cartCount, setCartCount] = useState(0);
   const [totalAmount, setTotalAmount] = useState(0);
@@ -228,6 +230,11 @@ export const CartProvider = ({ children }) => {
   // ── Standard DB Product Cart ──────────────────────────────────────────────
 
   const addToCart = async (productIdOrObject, variantId = null, quantity = 1, customizationData = null) => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      throw new Error('Please log in to add items to your cart.');
+    }
+
     let pId = null;
     let vId = null;
     let qty = 1;
@@ -276,6 +283,11 @@ export const CartProvider = ({ children }) => {
   // ── Custom Template Cart ──────────────────────────────────────────────────
 
   const addCustomTemplateToCart = async (customizationId, clothingType, size, color, quantity = 1) => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      throw new Error('Please log in to add items to your cart.');
+    }
+
     try {
       const response = await api.post('/custom-cart', {
         customizationId,

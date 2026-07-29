@@ -5,7 +5,7 @@ import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import morgan from 'morgan';
 
-// 1. ADD THIS AT THE ABSOLUTE TOP OF YOUR INITIALIZATIONS
+
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -38,6 +38,7 @@ import settingRoutes from './routes/settingRoutes.js';
 import inventoryRoutes from './routes/inventoryRoutes.js';
 import bannerRoutes from './routes/bannerRoutes.js';
 import apparelTemplateRoutes, { publicApparelRouter as apparelPublicRoutes } from './routes/apparelTemplateRoutes.js';
+import imageGenerationRoutes from './routes/imageGenerationRoutes.js';
 
 import { sanitizeData } from './middlewares/sanitize.js';
 import { apiLimiter } from './middlewares/rateLimiter.js';
@@ -105,6 +106,7 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/banners', bannerRoutes);
 app.use('/api/admin/apparel-templates', apparelTemplateRoutes);
 app.use('/api/apparel-templates', apparelPublicRoutes); // Public — used by frontend customizer
+app.use('/api/generate-image', imageGenerationRoutes);
 
 // Fallbacks
 app.use(notFound);

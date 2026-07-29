@@ -265,27 +265,27 @@ export default function ImageUploadPanel() {
 
                 {/* Hover overlay */}
                 {bgRemovalLoadingId !== item.id && (
-                  <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                  <div className="absolute inset-0 bg-slate-900/60 transition-opacity flex items-center justify-center gap-2 p-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:bg-slate-900/60 max-sm:items-end max-sm:bg-gradient-to-t max-sm:from-slate-950/80 max-sm:via-slate-950/40 max-sm:to-transparent">
                     <button
                       onClick={() => handleAddToCanvas(item.thumbnail)}
-                      className="w-8 h-8 rounded-lg bg-[#936A3B] text-white flex items-center justify-center hover:bg-[#805B31] transition-colors cursor-pointer"
+                      className="w-9 h-9 sm:w-8 sm:h-8 rounded-lg bg-[#936A3B] text-white flex items-center justify-center hover:bg-[#805B31] active:scale-95 transition-all cursor-pointer shadow-sm"
                       title="Add to canvas"
                     >
-                      <ImagePlus className="h-4 w-4" />
+                      <ImagePlus className="h-4.5 w-4.5 sm:h-4 sm:w-4" />
                     </button>
                     <button
                       onClick={() => handleRemoveBackground(item)}
-                      className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center hover:bg-indigo-700 transition-colors cursor-pointer"
+                      className="w-9 h-9 sm:w-8 sm:h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center hover:bg-indigo-700 active:scale-95 transition-all cursor-pointer shadow-sm"
                       title="Remove Background"
                     >
-                      <Wand2 className="h-4 w-4" />
+                      <Wand2 className="h-4.5 w-4.5 sm:h-4 sm:w-4" />
                     </button>
                     <button
                       onClick={() => handleRemoveUpload(item.id, item.isPersisted)}
-                      className="w-8 h-8 rounded-lg bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors cursor-pointer"
+                      className="w-9 h-9 sm:w-8 sm:h-8 rounded-lg bg-red-500 text-white flex items-center justify-center hover:bg-red-600 active:scale-95 transition-all cursor-pointer shadow-sm"
                       title="Remove"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-4.5 w-4.5 sm:h-4 sm:w-4" />
                     </button>
                   </div>
                 )}

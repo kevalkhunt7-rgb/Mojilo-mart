@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import ProductCard from '../components/ProductCard';
 import { useWishlist } from '../context/WishlistContext';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import ConfirmationModal from '../components/ConfirmationModal';
 import { Heart, ShoppingBag, Sparkles } from 'lucide-react';
 import api from '../lib/axios';
@@ -34,6 +36,7 @@ const styles = `
 const WishlistPage = () => {
   const { wishlist, removeFromWishlist, clearWishlist } = useWishlist();
   const { addToCart } = useCart();
+  const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
   const [isModalOpen, setIsModalOpen]   = useState(false);
@@ -71,22 +74,37 @@ const WishlistPage = () => {
     setIsModalOpen(true);
   };
 
-  const handleMoveAllToBag = () => {
+  const handleMoveAllToBag = async () => {
     if (!wishlist.length) return;
-    wishlist.forEach((product) => {
-      const defaultSize    = product.sizes?.[0] || 'S';
-      const defaultColorObj = product.colors?.[0] || 'olive';
-      const colorObj = typeof defaultColorObj === 'object'
-        ? defaultColorObj
-        : { id: defaultColorObj, name: defaultColorObj };
-      const colorId    = typeof colorObj === 'object' ? colorObj.id : colorObj;
-      const cartItemId = `${product.id}-${colorId}-${defaultSize}`;
-      addToCart({ ...product, cartItemId, selectedSize: defaultSize, selectedColor: colorObj }, 1);
-    });
-    clearWishlist();
+    if (!isAuthenticated) {
+      toast.error('Please log in to add items to your cart.');
+      navigate('/login');
+      return;
+    }
+    try {
+      for (const product of wishlist) {
+        const defaultSize    = product.sizes?.[0] || 'S';
+        const defaultColorObj = product.colors?.[0] || 'olive';
+        const colorObj = typeof defaultColorObj === 'object'
+          ? defaultColorObj
+          : { id: defaultColorObj, name: defaultColorObj };
+        const colorId    = typeof colorObj === 'object' ? colorObj.id : colorObj;
+        const cartItemId = `${product.id}-${colorId}-${defaultSize}`;
+        await addToCart({ ...product, cartItemId, selectedSize: defaultSize, selectedColor: colorObj }, 1);
+      }
+      clearWishlist();
+    } catch (err) {
+      toast.error(err.message || 'Failed to add items to cart');
+    }
   };
 
-  const handleAddToCartSingle = (product) => addToCart(product, 1);
+  const handleAddToCartSingle = async (product) => {
+    try {
+      await addToCart(product, 1);
+    } catch (err) {
+      toast.error(err.message || 'Failed to add item to cart');
+    }
+  };
 
   const handleConfirmAction = () => {
     if (modalTarget.type === 'SINGLE_REMOVE' && modalTarget.id) {

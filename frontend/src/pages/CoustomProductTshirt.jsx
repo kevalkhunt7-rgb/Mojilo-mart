@@ -32,7 +32,9 @@ import {
   Trash2,
   Plus,
   Eye,
-  Move
+  Move,
+  LogIn,
+  ShieldAlert
 } from "lucide-react";
 
 // Components
@@ -55,6 +57,7 @@ import { useCanvas } from "../context/CanvasContext";
 import { useCanvasTextureSync } from "../hooks/useCanvasTextureSync";
 import { useCustomizerStore } from "../store/useCustomizerStore";
 import { useCart } from "../context/CartContext";
+import { useAuth } from "../context/AuthContext";
 import { apparelConfig } from "../utils/apparelConfig";
 import { recalculateTextCurve } from "../utils/textCurveHelper";
 import api from "../lib/axios";
@@ -448,6 +451,7 @@ export default function CoustomProductTshirt() {
   });
   const [dbProduct, setDbProduct] = useState(null);
   const { addCustomTemplateToCart } = useCart();
+  const { isAuthenticated } = useAuth();
 
   // ------------------------------------------------------------------
   // Mobile view state
@@ -868,6 +872,11 @@ export default function CoustomProductTshirt() {
 
   // Add customized product to cart
   const handleAddToCart = async () => {
+    if (!isAuthenticated) {
+      toast.error("Please log in to add items to your cart.");
+      navigate("/login");
+      return;
+    }
     if (addingToCart) return;
     setAddingToCart(true);
     setCartLoaderState({
@@ -909,7 +918,15 @@ export default function CoustomProductTshirt() {
       if (previews.right) productionFiles.rightSleevePrintUrl = previews.right;
 
       // 🟢 2b. Capture 3D WebGL Canvas snapshot as JPEG 0.75 to keep payload small
-      const threeDCanvas = document.querySelector("canvas"); // Target the R3F canvas
+      const allCanvases = Array.from(document.querySelectorAll("canvas"));
+      const threeDCanvas = allCanvases.find((c) => {
+        try {
+          return c.getContext("webgl") || c.getContext("webgl2") || c.getContext("experimental-webgl");
+        } catch (e) {
+          return false;
+        }
+      }) || allCanvases[allCanvases.length - 1];
+
       if (threeDCanvas) {
         try {
           const threeDDataUrl = threeDCanvas.toDataURL("image/jpeg", 0.75);
@@ -1118,7 +1135,8 @@ export default function CoustomProductTshirt() {
   // from burning CPU/GPU while off-screen.
   // ------------------------------------------------------------------
   const shouldMountPreview = !isMobile || mobileMainView === "preview";
-  const shouldMountEditor = !isMobile || mobileMainView === "editor";
+  // CanvasEditor stays mounted continuously so Fabric canvas state, pricing, and previews are never lost on mobile view toggle
+  const shouldMountEditor = true;
   // Tool tab content only needs to exist once it's actually visible:
   // always on desktop, or on mobile once the sheet has been opened.
   const shouldMountTools = !isMobile || mobileSheetOpen;
@@ -1437,9 +1455,71 @@ export default function CoustomProductTshirt() {
     "bg-remover": "Background Remover",
   }[activeTab];
 
+  // Auth banner dismiss state — shown once per page load for guests
+  const [authBannerDismissed, setAuthBannerDismissed] = useState(false);
+  const showAuthBanner = !isAuthenticated && !authBannerDismissed;
+
   return (
     <div className={`h-screen flex flex-col font-sans antialiased overflow-hidden ${isDarkMode ? "bg-slate-900 text-slate-100 dark" : "bg-slate-50 text-slate-800"
       }`}>
+
+      {/* ── Guest Auth Alert Banner ─────────────────────────────────────────
+          Shown at the very top when the user is not logged in.
+          Smoothly animates in, and can be dismissed with the × button.
+      ─────────────────────────────────────────────────────────────────── */}
+      {showAuthBanner && (
+        <div
+          role="alert"
+          className="shrink-0 flex items-center justify-between gap-3 px-4 py-2.5
+            bg-gradient-to-r from-amber-800 via-orange-800 to-amber-800
+            text-white text-xs font-semibold shadow-md z-50
+            animate-[slideDown_0.35s_cubic-bezier(0.16,1,0.3,1)_both]"
+          style={{
+            /* inline keyframes so no external CSS file change is needed */
+          }}
+        >
+          <style>{`
+            @keyframes slideDown {
+              from { transform: translateY(-110%); opacity: 0; }
+              to   { transform: translateY(0);     opacity: 1; }
+            }
+          `}</style>
+
+          {/* Left: icon + message */}
+          <div className="flex items-center gap-2 min-w-0">
+            <ShieldAlert className="h-4 w-4 shrink-0 text-white/90" />
+            <span className="truncate">
+              You're browsing as a guest. Please&nbsp;
+              <button
+                onClick={() => navigate("/login")}
+                className="underline underline-offset-2 font-bold hover:text-white/80 transition-colors cursor-pointer"
+              >
+                log in
+              </button>
+              &nbsp;to save your design or add to cart.
+            </span>
+          </div>
+
+          {/* Right: Login CTA + dismiss */}
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => navigate("/login")}
+              className="flex items-center gap-1.5 px-3 py-1 bg-white/20 hover:bg-white/30 active:bg-white/40
+                border border-white/30 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
+            >
+              <LogIn className="h-3.5 w-3.5" />
+              Login
+            </button>
+            <button
+              onClick={() => setAuthBannerDismissed(true)}
+              aria-label="Dismiss login reminder"
+              className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-white/20 active:bg-white/30 transition-colors cursor-pointer"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Dynamic Header */}
       <header className="h-14 border-b shrink-0 flex items-center justify-between gap-2 px-2 sm:px-4 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 z-30 shadow-sm transition-colors overflow-x-auto scrollbar-hide">
@@ -1476,29 +1556,48 @@ export default function CoustomProductTshirt() {
       </header>
 
       {/* ============================================================
-          MOBILE-ONLY toolbar row: Grid / Rulers — only relevant while
-          looking at the flat 2D artwork, so only shown in editor view.
+          MOBILE-ONLY toolbar row: Grid / Rulers + Front/Back view switcher —
+          only relevant while looking at the flat 2D artwork.
           ============================================================ */}
       {isMobile && mobileMainView === "editor" && (
-        <div className="lg:hidden shrink-0 flex items-center gap-2 px-3 py-2 border-b bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 z-20">
-          <button
-            onClick={() => setShowGrid((v) => !v)}
-            className={`flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-bold border cursor-pointer transition-colors ${showGrid
-              ? "bg-violet-600 border-violet-600 text-white"
-              : "bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-200"
-              }`}
-          >
-            <Grid3x3 className="h-3.5 w-3.5" /> Grid
-          </button>
-          <button
-            onClick={() => setShowRulers((v) => !v)}
-            className={`flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-bold border cursor-pointer transition-colors ${showRulers
-              ? "bg-violet-600 border-violet-600 text-white"
-              : "bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-200"
-              }`}
-          >
-            <Ruler className="h-3.5 w-3.5" /> Rulers
-          </button>
+        <div className="lg:hidden shrink-0 flex items-center justify-between gap-1 px-3 py-2 border-b bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 z-20">
+          {/* <div className="flex items-center ">
+            <button
+              onClick={() => setShowGrid((v) => !v)}
+              className={`flex items-center gap-1 h-8 px-2.5 rounded-lg text-xs font-bold border cursor-pointer transition-colors ${showGrid
+                ? "bg-violet-600 border-violet-600 text-white"
+                : "bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-200"
+                }`}
+            >
+              <Grid3x3 className="h-3.5 w-3.5" /> Grid
+            </button>
+            <button
+              onClick={() => setShowRulers((v) => !v)}
+              className={`flex items-center gap-1 h-8 px-2.5 rounded-lg text-xs font-bold border cursor-pointer transition-colors ${showRulers
+                ? "bg-violet-600 border-violet-600 text-white"
+                : "bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-200"
+                }`}
+            >
+              <Ruler className="h-3.5 w-3.5" /> Rulers
+            </button>
+          </div> */}
+
+          {/* FRONT and BACK View Switcher Buttons */}
+          <div className="flex items-center bg-slate-100 dark:bg-slate-700 p-0.5 rounded-lg border border-slate-200 dark:border-slate-600">
+            {(productConfig.supportedViews || ["front", "back"]).map((view) => (
+              <button
+                key={view}
+                onClick={() => setSelectedView(view)}
+                className={`px-3 py-1 text-[11px] font-bold rounded-md uppercase tracking-wider transition-all cursor-pointer ${
+                  selectedView === view
+                    ? "bg-[#997241] text-white shadow-xs"
+                    : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
+                }`}
+              >
+                {view}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -1632,21 +1731,15 @@ export default function CoustomProductTshirt() {
             } w-full lg:w-[500px] scrollbar-hide h-full bg-slate-50 dark:bg-slate-900 flex-col shrink-0 relative overflow-hidden z-20`}
         >
           <div className="flex-1 overflow-y-auto flex flex-col justify-start items-stretch">
-            {shouldMountEditor ? (
-              <>
-                <div className="w-full flex justify-center h-fit">
-                  <CanvasEditor
-                    manualSync={manualTriggerSync}
-                    showGrid={showGrid}
-                    showRulers={showRulers}
-                  />
-                </div>
-                {/* Object coordinates inspector panel */}
-                <ObjectInspector />
-              </>
-            ) : (
-              <PanelSkeleton label="Editor paused" />
-            )}
+            <div className="w-full flex justify-center h-fit">
+              <CanvasEditor
+                manualSync={manualTriggerSync}
+                showGrid={showGrid}
+                showRulers={showRulers}
+              />
+            </div>
+            {/* Object coordinates inspector panel */}
+            <ObjectInspector />
           </div>
         </aside>
 
