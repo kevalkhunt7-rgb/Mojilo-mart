@@ -4,7 +4,7 @@ import helmet from 'helmet';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import morgan from 'morgan';
-
+import path from 'path';
 
 import dotenv from 'dotenv';
 dotenv.config();
@@ -50,15 +50,42 @@ const app = express();
 // 3. RUN CLOUDINARY INITIALIZATION IMMEDIATELY AFTER CREATING THE APP INSTANCE
 configureCloudinary();
 
-// Security Middlewares
-app.use(helmet());
+// Security & CORS Middlewares — configured for cross-origin canvas textures on Vercel
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  crossOriginEmbedderPolicy: false,
+}));
+
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5176',
+  'https://mojilo-mart.vercel.app',
+  process.env.FRONTEND_URL,
+].filter(Boolean);
+
 app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    'https://mojilo-mart.vercel.app',
-    'http://localhost:5176'
-  ],
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+      return callback(null, true);
+    }
+    return callback(null, true);
+  },
   credentials: true
+}));
+
+// Static Asset Serving with Cross-Origin Headers for Fabric.js canvas textures
+app.use('/uploads', cors(), express.static(path.join(process.cwd(), 'uploads'), {
+  setHeaders: (res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  }
+}));
+
+app.use('/public', cors(), express.static(path.join(process.cwd(), 'public'), {
+  setHeaders: (res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  }
 }));
 
 // Performance Middlewares

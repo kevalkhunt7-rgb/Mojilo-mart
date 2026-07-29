@@ -8,26 +8,29 @@ export const loadCorsSafeImage = async (rawUrl) => {
     throw new Error("Invalid image URL");
   }
 
-  // 1. Data URLs are already self-contained and clean
-  if (rawUrl.startsWith("data:")) {
+  // 1. Data URLs & Blob URLs are already self-contained and clean
+  if (rawUrl.startsWith("data:") || rawUrl.startsWith("blob:")) {
     return new Promise((resolve, reject) => {
       const img = new Image();
       img.crossOrigin = "anonymous";
       img.onload = () => resolve(img);
-      img.onerror = (e) => reject(new Error("Failed to load Data URL image"));
+      img.onerror = (e) => reject(new Error("Failed to load Data/Blob URL image"));
       img.src = rawUrl;
-    });         
+    });
   }
 
   // Determine proxy URL and API endpoints
-  const backendUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
   const apiBase = (import.meta.env.VITE_API_URL || "http://localhost:5000/api").replace(/\/api$/, "") + "/api";
+  const backendRoot = apiBase.replace(/\/api$/, "");
 
-  let proxyUrl = rawUrl;
-  if (!rawUrl.includes("/uploads/proxy") && (rawUrl.startsWith("http://") || rawUrl.startsWith("https://"))) {
-    proxyUrl = `${apiBase}/uploads/proxy?url=${encodeURIComponent(rawUrl)}`;
-  } else if (rawUrl.startsWith("/")) {
-    proxyUrl = `${backendUrl}${rawUrl}`;
+  let targetUrl = rawUrl;
+  if (rawUrl.startsWith("/")) {
+    targetUrl = `${backendRoot}${rawUrl}`;
+  }
+
+  let proxyUrl = targetUrl;
+  if (!rawUrl.includes("/uploads/proxy") && (targetUrl.startsWith("http://") || targetUrl.startsWith("https://"))) {
+    proxyUrl = `${apiBase}/uploads/proxy?url=${encodeURIComponent(targetUrl)}`;
   }
 
   const blobToDataUrl = (blob) => {
@@ -49,7 +52,19 @@ export const loadCorsSafeImage = async (rawUrl) => {
     });
   };
 
-  // Attempt 1: Fetch via Backend Proxy & convert to Data URL
+  // Attempt 1: Direct fetch & convert to Data URL (Fastest for CORS-enabled CDNs like Cloudinary, Icons8, Pollinations)
+  try {
+    const res = await fetch(targetUrl, { mode: "cors" });
+    if (res.ok) {
+      const blob = await res.blob();
+      const dataUrl = await blobToDataUrl(blob);
+      return await createImgFromDataUrl(dataUrl);
+    }
+  } catch (err) {
+    console.warn("Direct fetch failed, attempting backend proxy fetch...", err);
+  }
+
+  // Attempt 2: Fetch via Backend Proxy & convert to Data URL
   try {
     const res = await fetch(proxyUrl);
     if (res.ok) {
@@ -58,19 +73,7 @@ export const loadCorsSafeImage = async (rawUrl) => {
       return await createImgFromDataUrl(dataUrl);
     }
   } catch (err) {
-    console.warn("Proxy fetch failed, attempting direct fetch...", err);
-  }
-
-  // Attempt 2: Direct fetch & convert to Data URL
-  try {
-    const res = await fetch(rawUrl, { mode: "cors" });
-    if (res.ok) {
-      const blob = await res.blob();
-      const dataUrl = await blobToDataUrl(blob);
-      return await createImgFromDataUrl(dataUrl);
-    }
-  } catch (err) {
-    console.warn("Direct fetch failed, attempting Image element fallback...", err);
+    console.warn("Proxy fetch failed, attempting Image element fallback...", err);
   }
 
   // Attempt 3: Direct HTMLImageElement load with crossOrigin = "anonymous"
@@ -79,6 +82,6 @@ export const loadCorsSafeImage = async (rawUrl) => {
     img.crossOrigin = "anonymous";
     img.onload = () => resolve(img);
     img.onerror = (e) => reject(new Error(`Failed to load image from URL: ${rawUrl}`));
-    img.src = proxyUrl || rawUrl;
+    img.src = proxyUrl || targetUrl;
   });
 };
