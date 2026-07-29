@@ -1,11 +1,11 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 
 // Create the Context
 const CanvasContext = createContext(null);
 
 // Create the Provider Component
 export const CanvasProvider = ({ children }) => {
-  // 👕 All core Fabric Canvas instances managed gracefully in memory
+  // 👕 Core Fabric Canvas instances managed in state
   const [frontCanvas, setFrontCanvas] = useState(null);
   const [backCanvas, setBackCanvas] = useState(null);
   const [leftCanvas, setLeftCanvas] = useState(null);
@@ -13,98 +13,165 @@ export const CanvasProvider = ({ children }) => {
   const [pocketCanvas, setPocketCanvas] = useState(null);
   const [hoodCanvas, setHoodCanvas] = useState(null);
   
-  // Track which canvas view is currently active/visible in editing
-  const [activeCanvas, setActiveCanvas] = useState(null);
-  
+  // Track active canvas both in React state and in a synchronous Ref
+  const [activeCanvasState, setActiveCanvasState] = useState(null);
+  const activeCanvasRef = useRef(null);
+
+  // Map storing live Fabric canvas instances by view key
+  const canvasMapRef = useRef({
+    front: null,
+    back: null,
+    left: null,
+    right: null,
+    pocket: null,
+    hood: null,
+  });
+
+  // Synchronous active canvas setter
+  const setActiveCanvas = useCallback((canvasInstance) => {
+    activeCanvasRef.current = canvasInstance;
+    setActiveCanvasState(canvasInstance);
+  }, []);
+
+  // Immediate registration on canvas creation
+  const registerCanvas = useCallback((view, canvasInstance, isSelected = false) => {
+    if (!view || !canvasInstance) return;
+    canvasMapRef.current[view] = canvasInstance;
+
+    if (view === "front") setFrontCanvas(canvasInstance);
+    if (view === "back") setBackCanvas(canvasInstance);
+    if (view === "left") setLeftCanvas(canvasInstance);
+    if (view === "right") setRightCanvas(canvasInstance);
+    if (view === "pocket") setPocketCanvas(canvasInstance);
+    if (view === "hood") setHoodCanvas(canvasInstance);
+
+    // Activate immediately if this is the selected view or if no active canvas exists yet
+    if (isSelected || !activeCanvasRef.current) {
+      activeCanvasRef.current = canvasInstance;
+      setActiveCanvasState(canvasInstance);
+    }
+  }, []);
+
+  // Unregister on unmount / cleanup
+  const unregisterCanvas = useCallback((view) => {
+    if (!view) return;
+    const instance = canvasMapRef.current[view];
+    canvasMapRef.current[view] = null;
+
+    if (view === "front") setFrontCanvas(null);
+    if (view === "back") setBackCanvas(null);
+    if (view === "left") setLeftCanvas(null);
+    if (view === "right") setRightCanvas(null);
+    if (view === "pocket") setPocketCanvas(null);
+    if (view === "hood") setHoodCanvas(null);
+
+    if (activeCanvasRef.current === instance) {
+      activeCanvasRef.current = null;
+      setActiveCanvasState(null);
+    }
+  }, []);
+
+  // Synchronous fallback getter for tool panels
+  const getActiveCanvas = useCallback(() => {
+    if (activeCanvasRef.current) return activeCanvasRef.current;
+    if (activeCanvasState) return activeCanvasState;
+    const map = canvasMapRef.current;
+    return map.front || map.back || map.left || map.right || map.pocket || map.hood || null;
+  }, [activeCanvasState]);
+
   // Track currently clicked/highlighted object on the active workspace
   const [selectedObject, setSelectedObject] = useState(null);
 
   // 📑 Dynamic state array tracking layers list for the active view viewport
   const [canvasLayers, setCanvasLayers] = useState([]);
 
-  // Utility hook helper to automatically refresh layers array whenever canvas modifications execute
+  // Resolve effective active canvas (state > ref > registered map)
+  const effectiveActiveCanvas = activeCanvasState || activeCanvasRef.current || canvasMapRef.current.front || canvasMapRef.current.back || canvasMapRef.current.left || canvasMapRef.current.right || canvasMapRef.current.pocket || canvasMapRef.current.hood;
+
+  // Automatically refresh layers array whenever canvas modifications execute
   useEffect(() => {
-    if (!activeCanvas) {
+    const canvas = effectiveActiveCanvas;
+    if (!canvas) {
       setCanvasLayers([]);
       return;
     }
 
     const refreshLayersList = () => {
-      const objects = activeCanvas.getObjects ? activeCanvas.getObjects() : [];
+      const objects = canvas.getObjects ? canvas.getObjects() : [];
       setCanvasLayers([...objects].reverse());
     };
 
-    activeCanvas.on("object:added", refreshLayersList);
-    activeCanvas.on("object:removed", refreshLayersList);
-    activeCanvas.on("object:modified", refreshLayersList);
-    activeCanvas.on("selection:created", refreshLayersList);
-    activeCanvas.on("selection:updated", refreshLayersList);
-    activeCanvas.on("selection:cleared", refreshLayersList);
+    canvas.on("object:added", refreshLayersList);
+    canvas.on("object:removed", refreshLayersList);
+    canvas.on("object:modified", refreshLayersList);
+    canvas.on("selection:created", refreshLayersList);
+    canvas.on("selection:updated", refreshLayersList);
+    canvas.on("selection:cleared", refreshLayersList);
 
-    // Run a baseline load check
+    // Baseline load check
     refreshLayersList();
 
     return () => {
-      activeCanvas.off("object:added", refreshLayersList);
-      activeCanvas.off("object:removed", refreshLayersList);
-      activeCanvas.off("object:modified", refreshLayersList);
-      activeCanvas.off("selection:created", refreshLayersList);
-      activeCanvas.off("selection:updated", refreshLayersList);
-      activeCanvas.off("selection:cleared", refreshLayersList);
+      canvas.off("object:added", refreshLayersList);
+      canvas.off("object:removed", refreshLayersList);
+      canvas.off("object:modified", refreshLayersList);
+      canvas.off("selection:created", refreshLayersList);
+      canvas.off("selection:updated", refreshLayersList);
+      canvas.off("selection:cleared", refreshLayersList);
     };
-  }, [activeCanvas]);
+  }, [effectiveActiveCanvas]);
 
   // 🎛️ Dynamic Stack Ordering Layer Manipulators
-  // Fabric v6: stacking methods moved from object → canvas
   const moveLayerUp = (fabricObject) => {
-    if (!activeCanvas || !fabricObject) return;
-    activeCanvas.bringObjectForward(fabricObject);
-    activeCanvas.renderAll();
-    activeCanvas.fire("object:modified");
+    const canvas = getActiveCanvas();
+    if (!canvas || !fabricObject) return;
+    canvas.bringObjectForward(fabricObject);
+    canvas.renderAll();
+    canvas.fire("object:modified");
   };
 
   const moveLayerDown = (fabricObject) => {
-    if (!activeCanvas || !fabricObject) return;
-    activeCanvas.sendObjectBackwards(fabricObject);
-    activeCanvas.renderAll();
-    activeCanvas.fire("object:modified");
+    const canvas = getActiveCanvas();
+    if (!canvas || !fabricObject) return;
+    canvas.sendObjectBackwards(fabricObject);
+    canvas.renderAll();
+    canvas.fire("object:modified");
   };
 
   const bringLayerToFront = (fabricObject) => {
-    if (!activeCanvas || !fabricObject) return;
-    activeCanvas.bringObjectToFront(fabricObject);
-    activeCanvas.renderAll();
-    activeCanvas.fire("object:modified");
+    const canvas = getActiveCanvas();
+    if (!canvas || !fabricObject) return;
+    canvas.bringObjectToFront(fabricObject);
+    canvas.renderAll();
+    canvas.fire("object:modified");
   };
 
   const sendLayerToBack = (fabricObject) => {
-    if (!activeCanvas || !fabricObject) return;
-    activeCanvas.sendObjectToBack(fabricObject);
-    activeCanvas.renderAll();
-    activeCanvas.fire("object:modified");
+    const canvas = getActiveCanvas();
+    if (!canvas || !fabricObject) return;
+    canvas.sendObjectToBack(fabricObject);
+    canvas.renderAll();
+    canvas.fire("object:modified");
   };
 
   const deleteLayer = (fabricObject) => {
-    if (!activeCanvas || !fabricObject) return;
-    activeCanvas.remove(fabricObject);
-    activeCanvas.discardActiveObject();
-    activeCanvas.renderAll();
+    const canvas = getActiveCanvas();
+    if (!canvas || !fabricObject) return;
+    canvas.remove(fabricObject);
+    canvas.discardActiveObject();
+    canvas.renderAll();
     setSelectedObject(null);
   };
 
   // Helper utility to safely clear configurations across all view frames
   const resetCanvases = () => {
-    // Helper to safely clear a single canvas
     const safeClearCanvas = (canvas) => {
       if (!canvas) return;
       try {
-        // Check if canvas is fully initialized with valid context
         if (canvas.getContext && typeof canvas.getContext === 'function') {
           const ctx = canvas.getContext();
           if (ctx) {
             canvas.clear?.();
-          } else {
-            console.warn("safeClearCanvas: Canvas context not available yet");
           }
         }
       } catch (error) {
@@ -119,7 +186,9 @@ export const CanvasProvider = ({ children }) => {
     safeClearCanvas(pocketCanvas);
     safeClearCanvas(hoodCanvas);
 
-    setActiveCanvas(null);
+    activeCanvasRef.current = null;
+    canvasMapRef.current = { front: null, back: null, left: null, right: null, pocket: null, hood: null };
+    setActiveCanvasState(null);
     setSelectedObject(null);
     setCanvasLayers([]);
   };
@@ -139,8 +208,11 @@ export const CanvasProvider = ({ children }) => {
         setPocketCanvas,
         hoodCanvas,
         setHoodCanvas,
-        activeCanvas,
+        activeCanvas: effectiveActiveCanvas,
         setActiveCanvas,
+        registerCanvas,
+        unregisterCanvas,
+        getActiveCanvas,
         selectedObject,
         setSelectedObject,
         canvasLayers,

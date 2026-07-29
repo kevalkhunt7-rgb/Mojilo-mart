@@ -97,13 +97,14 @@ export default function StickersPanel({ manualSync }) {
   };
 
   const handleAddSticker = async (rawImgUrl) => {
-    if (!activeCanvas || !rawImgUrl) return;
+    const canvas = activeCanvas || getActiveCanvas();
+    if (!canvas || !rawImgUrl) return;
 
     try {
       const imgElement = await loadCorsSafeImage(rawImgUrl);
       const fabricImg = new fabric.Image(imgElement, {
-        left: activeCanvas.width / 2,
-        top: activeCanvas.height / 2,
+        left: canvas.width / 2,
+        top: canvas.height / 2,
         originX: "center",
         originY: "center",
         originalSrc: rawImgUrl,
@@ -113,12 +114,12 @@ export default function StickersPanel({ manualSync }) {
       fabricImg.set({ crossOrigin: "anonymous" });
       fabricImg.scaleToWidth(120);
 
-      activeCanvas.add(fabricImg);
-      activeCanvas.setActiveObject(fabricImg);
-      activeCanvas.renderAll();
-      activeCanvas.fire("object:modified");
+      canvas.add(fabricImg);
+      canvas.setActiveObject(fabricImg);
+      canvas.renderAll();
+      canvas.fire("object:modified");
 
-      canvasSyncManager.getCanvasTexture(activeCanvas);
+      canvasSyncManager.getCanvasTexture(canvas);
       if (manualSync) manualSync();
     } catch (err) {
       console.error("Failed to add sticker to canvas:", err);

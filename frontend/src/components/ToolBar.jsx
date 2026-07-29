@@ -28,7 +28,7 @@ const ToolBar = ({
   const fileInputRef = useRef(null);
   const globalTshirtColor = useSelector((state) => state.tshirt.tshirtColor);
 
-  const { activeCanvas, selectedObject } = useCanvas();
+  const { activeCanvas, getActiveCanvas, selectedObject } = useCanvas();
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
   const buttonRef = useRef(null);
   const [popoverCoords, setPopoverCoords] = useState({ top: 0, left: 0 });
@@ -66,7 +66,8 @@ const ToolBar = ({
   const triggerFileInput = () => fileInputRef.current?.click();
 
   const handleAddImage = (e) => {
-    if (!activeCanvas || !e.target.files?.[0]) return;
+    const canvas = activeCanvas || getActiveCanvas();
+    if (!canvas || !e.target.files?.[0]) return;
     const file = e.target.files[0];
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -82,15 +83,15 @@ const ToolBar = ({
           image.scale(scale);
         }
         image.set({
-          left: (activeCanvas.width - image.getScaledWidth()) / 2,
-          top: (activeCanvas.height - image.getScaledHeight()) / 2,
+          left: (canvas.width - image.getScaledWidth()) / 2,
+          top: (canvas.height - image.getScaledHeight()) / 2,
           crossOrigin: "anonymous",
         });
-        activeCanvas.add(image);
-        activeCanvas.setActiveObject(image);
-        activeCanvas.renderAll();
-        activeCanvas.fire("object:modified");
-        canvasSyncManager.getCanvasTexture(activeCanvas);
+        canvas.add(image);
+        canvas.setActiveObject(image);
+        canvas.renderAll();
+        canvas.fire("object:modified");
+        canvasSyncManager.getCanvasTexture(canvas);
       };
     };
     reader.readAsDataURL(file);
@@ -98,18 +99,20 @@ const ToolBar = ({
   };
 
   const handleDelete = () => {
-    if (!activeCanvas || !selectedObject) return;
-    activeCanvas.remove(selectedObject);
-    activeCanvas.discardActiveObject();
-    activeCanvas.renderAll();
+    const canvas = activeCanvas || getActiveCanvas();
+    if (!canvas || !selectedObject) return;
+    canvas.remove(selectedObject);
+    canvas.discardActiveObject();
+    canvas.renderAll();
     manualSync();
   };
 
   const handleClearAll = () => {
-    if (!activeCanvas) return;
-    activeCanvas.clear();
+    const canvas = activeCanvas || getActiveCanvas();
+    if (!canvas) return;
+    canvas.clear();
     canvasStorageManager.clearCanvasStorage("all");
-    activeCanvas.renderAll();
+    canvas.renderAll();
     manualSync();
   };
 

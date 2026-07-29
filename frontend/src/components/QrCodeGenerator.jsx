@@ -5,7 +5,7 @@ import { QrCode, Plus } from "lucide-react";
 import { canvasSyncManager } from "../utils/canvasSyncManager";
 
 export default function QrCodeGenerator() {
-  const { activeCanvas } = useCanvas();
+  const { activeCanvas, getActiveCanvas } = useCanvas();
   const [text, setText] = useState("");
   const [qrUrl, setQrUrl] = useState(null);
 
@@ -20,7 +20,8 @@ export default function QrCodeGenerator() {
   };
 
   const handleAddQrToCanvas = () => {
-    if (!activeCanvas || !qrUrl) return;
+    const canvas = activeCanvas || getActiveCanvas();
+    if (!canvas || !qrUrl) return;
 
     const imgElement = new Image();
     imgElement.crossOrigin = "anonymous";
@@ -28,8 +29,8 @@ export default function QrCodeGenerator() {
 
     imgElement.onload = () => {
       const fabricImg = new fabric.Image(imgElement, {
-        left: activeCanvas.width / 2,
-        top: activeCanvas.height / 2,
+        left: canvas.width / 2,
+        top: canvas.height / 2,
         originX: "center",
         originY: "center",
         crossOrigin: "anonymous",
@@ -38,12 +39,12 @@ export default function QrCodeGenerator() {
       fabricImg.set({ crossOrigin: "anonymous" });
       fabricImg.scaleToWidth(120);
 
-      activeCanvas.add(fabricImg);
-      activeCanvas.setActiveObject(fabricImg);
-      activeCanvas.renderAll();
-      activeCanvas.fire("object:modified");
+      canvas.add(fabricImg);
+      canvas.setActiveObject(fabricImg);
+      canvas.renderAll();
+      canvas.fire("object:modified");
 
-      canvasSyncManager.getCanvasTexture(activeCanvas);
+      canvasSyncManager.getCanvasTexture(canvas);
     };
   };
 

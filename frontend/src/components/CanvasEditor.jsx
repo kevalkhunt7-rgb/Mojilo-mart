@@ -176,12 +176,8 @@ function SingleCanvasViewport({ view, printArea, manualSync, isSelected, current
   const containerRef = useRef(null);
   const fabricCanvasRef = useRef(null);
   const {
-    setFrontCanvas,
-    setBackCanvas,
-    setLeftCanvas,
-    setRightCanvas,
-    setPocketCanvas,
-    setHoodCanvas,
+    registerCanvas,
+    unregisterCanvas,
     setActiveCanvas,
     setSelectedObject
   } = useCanvas();
@@ -241,13 +237,8 @@ function SingleCanvasViewport({ view, printArea, manualSync, isSelected, current
 
     fabricCanvasRef.current = canvas;
 
-    // Register to canvas context
-    if (view === "front") setFrontCanvas(canvas);
-    if (view === "back") setBackCanvas(canvas);
-    if (view === "left") setLeftCanvas(canvas);
-    if (view === "right") setRightCanvas(canvas);
-    if (view === "pocket") setPocketCanvas(canvas);
-    if (view === "hood") setHoodCanvas(canvas);
+    // Immediately register canvas into context and activate if this view is selected
+    registerCanvas(view, canvas, isSelected);
 
     // Render print area dotted outline box
     const printAreaBox = new fabric.Rect({
@@ -456,22 +447,17 @@ function SingleCanvasViewport({ view, printArea, manualSync, isSelected, current
       containerEl.removeEventListener("drop", handleDrop);
       canvas.off("object:moving", handleObjectMoving);
       canvas.off("object:scaling", handleObjectScaling);
-      canvas.dispose();
+      unregisterCanvas(view);
+      try { canvas.dispose(); } catch (_) { }
       fabricCanvasRef.current = null;
-      if (view === "front") setFrontCanvas(null);
-      if (view === "back") setBackCanvas(null);
-      if (view === "left") setLeftCanvas(null);
-      if (view === "right") setRightCanvas(null);
-      if (view === "pocket") setPocketCanvas(null);
-      if (view === "hood") setHoodCanvas(null);
     };
-  }, [view, printArea.width, printArea.height]);
+  }, [view, printArea.width, printArea.height, registerCanvas, unregisterCanvas, isSelected]);
 
   useEffect(() => {
     if (isSelected && fabricCanvasRef.current) {
       setActiveCanvas(fabricCanvasRef.current);
     }
-  }, [isSelected]);
+  }, [isSelected, setActiveCanvas]);
 
   const drawCenterGuides = () => {
     const canvas = fabricCanvasRef.current;

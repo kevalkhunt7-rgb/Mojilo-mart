@@ -3,10 +3,11 @@ import { useCanvas } from "../context/CanvasContext";
 import { Move, Layers, Lock, Unlock, Copy, Trash2, Sliders, Ruler, X } from "lucide-react";
 
 export default function ObjectInspector({ onClose, targetObject: propTargetObject }) {
-  const { activeCanvas, selectedObject: contextSelectedObject, deleteLayer } = useCanvas();
+  const { activeCanvas, getActiveCanvas, selectedObject: contextSelectedObject, deleteLayer } = useCanvas();
+  const canvas = activeCanvas || getActiveCanvas();
 
-  // Resolve target object: propTargetObject > contextSelectedObject > activeCanvas.getActiveObject()
-  const targetObject = propTargetObject || contextSelectedObject || (activeCanvas?.getActiveObject ? activeCanvas.getActiveObject() : null);
+  // Resolve target object: propTargetObject > contextSelectedObject > canvas.getActiveObject()
+  const targetObject = propTargetObject || contextSelectedObject || (canvas?.getActiveObject ? canvas.getActiveObject() : null);
 
   const [coords, setCoords] = useState({ x: 0, y: 0 });
   const [dims, setDims] = useState({ w: 0, h: 0 });

@@ -16,7 +16,7 @@ const STATUS = {
 const API_BASE = (import.meta.env.VITE_API_URL || "http://127.0.0.1:5000/api").replace(/\/api$/, "");
 
 export default function AIImageGenerator() {
-  const { activeCanvas } = useCanvas();
+  const { activeCanvas, getActiveCanvas } = useCanvas();
 
   const promptRef = useRef(null);
   const [prompt, setPrompt] = useState("");
@@ -72,13 +72,14 @@ export default function AIImageGenerator() {
   };
 
   const handleAddToCanvas = async () => {
-    if (!activeCanvas || !generatedUrl) return;
+    const canvas = activeCanvas || getActiveCanvas();
+    if (!canvas || !generatedUrl) return;
 
     try {
       const imgElement = await loadCorsSafeImage(generatedUrl);
       const fabricImg = new fabric.Image(imgElement, {
-        left: activeCanvas.width / 2,
-        top: activeCanvas.height / 2,
+        left: canvas.width / 2,
+        top: canvas.height / 2,
         originX: "center",
         originY: "center",
         crossOrigin: "anonymous",
@@ -88,12 +89,12 @@ export default function AIImageGenerator() {
       fabricImg.scaleToWidth(140);
       fabricImg.isAIImage = true;
 
-      activeCanvas.add(fabricImg);
-      activeCanvas.setActiveObject(fabricImg);
-      activeCanvas.renderAll();
-      activeCanvas.fire("object:modified");
+      canvas.add(fabricImg);
+      canvas.setActiveObject(fabricImg);
+      canvas.renderAll();
+      canvas.fire("object:modified");
 
-      canvasSyncManager.getCanvasTexture(activeCanvas);
+      canvasSyncManager.getCanvasTexture(canvas);
     } catch (err) {
       console.error("[AIImageGenerator] Failed to place image on canvas:", err);
     }

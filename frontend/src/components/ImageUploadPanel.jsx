@@ -16,7 +16,8 @@ export default function ImageUploadPanel() {
     rightCanvas,
     pocketCanvas,
     hoodCanvas,
-    activeCanvas
+    activeCanvas,
+    getActiveCanvas,
   } = useCanvas();
   const fileInputRef = useRef(null);
   const [uploads, setUploads] = useState([]); // { id, thumbnail, name }
@@ -120,19 +121,14 @@ export default function ImageUploadPanel() {
   };
 
   const handleAddToCanvas = async (dataUrl) => {
-    if (!activeCanvas) {
-    console.error("❌ activeCanvas is NULL");
-    toast.error("Canvas not initialized");
-    return;
-}
-
-console.log("✅ activeCanvas", activeCanvas);
+    const canvas = activeCanvas || getActiveCanvas();
+    if (!canvas) return;
 
     try {
       const imgEl = await loadCorsSafeImage(dataUrl);
       const fabricImg = new fabric.Image(imgEl, {
-        left: activeCanvas.width / 2,
-        top: activeCanvas.height / 2,
+        left: canvas.width / 2,
+        top: canvas.height / 2,
         originX: "center",
         originY: "center",
         originalSrc: dataUrl,
@@ -140,14 +136,14 @@ console.log("✅ activeCanvas", activeCanvas);
       });
 
       fabricImg.set({ crossOrigin: "anonymous" });
-      fabricImg.scaleToWidth(Math.min(180, activeCanvas.width * 0.4));
+      fabricImg.scaleToWidth(Math.min(180, canvas.width * 0.4));
 
-      activeCanvas.add(fabricImg);
-      activeCanvas.setActiveObject(fabricImg);
-      activeCanvas.renderAll();
-      activeCanvas.fire("object:modified");
+      canvas.add(fabricImg);
+      canvas.setActiveObject(fabricImg);
+      canvas.renderAll();
+      canvas.fire("object:modified");
 
-      canvasSyncManager.getCanvasTexture(activeCanvas);
+      canvasSyncManager.getCanvasTexture(canvas);
     } catch (err) {
       console.error("Failed to add uploaded image to canvas:", err);
     }

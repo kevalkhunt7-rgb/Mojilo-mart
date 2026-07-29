@@ -126,7 +126,7 @@ function hexToRgba(hex, alpha = 1) {
 }
 
 export default function TypographyPanel({ manualSync }) {
-  const { activeCanvas } = useCanvas();
+  const { activeCanvas, getActiveCanvas } = useCanvas();
   const [selectedTextObject, setSelectedTextObject] = useState(null);
 
   // Core text staging state
@@ -165,7 +165,8 @@ export default function TypographyPanel({ manualSync }) {
   // Track canvas selection and hydrate the panel from the selected object
   // -------------------------------------------------------------------------
   useEffect(() => {
-    if (!activeCanvas) return;
+    const canvas = activeCanvas || getActiveCanvas();
+    if (!canvas) return;
 
     const updatePanelControls = (targetObject) => {
       if (targetObject && (targetObject.type === "textbox" || targetObject.type === "text" || targetObject.type === "i-text")) {
@@ -206,7 +207,7 @@ export default function TypographyPanel({ manualSync }) {
     };
 
     const handleSelectionCreated = (e) => {
-      const selected = e.selected?.[0] || activeCanvas.getActiveObject();
+      const selected = e.selected?.[0] || canvas.getActiveObject();
       updatePanelControls(selected);
     };
 
@@ -214,25 +215,26 @@ export default function TypographyPanel({ manualSync }) {
       setSelectedTextObject(null);
     };
 
-    activeCanvas.on("selection:created", handleSelectionCreated);
-    activeCanvas.on("selection:updated", handleSelectionCreated);
-    activeCanvas.on("selection:cleared", handleSelectionCleared);
-    activeCanvas.on("canvas:cleared", handleSelectionCleared);
+    canvas.on("selection:created", handleSelectionCreated);
+    canvas.on("selection:updated", handleSelectionCreated);
+    canvas.on("selection:cleared", handleSelectionCleared);
+    canvas.on("canvas:cleared", handleSelectionCleared);
 
-    const currentActive = activeCanvas.getActiveObject();
+    const currentActive = canvas.getActiveObject();
     if (currentActive) updatePanelControls(currentActive);
 
     return () => {
-      activeCanvas.off("selection:created", handleSelectionCreated);
-      activeCanvas.off("selection:updated", handleSelectionCreated);
-      activeCanvas.off("selection:cleared", handleSelectionCleared);
-      activeCanvas.off("canvas:cleared", handleSelectionCleared);
+      canvas.off("selection:created", handleSelectionCreated);
+      canvas.off("selection:updated", handleSelectionCreated);
+      canvas.off("selection:cleared", handleSelectionCleared);
+      canvas.off("canvas:cleared", handleSelectionCleared);
     };
-  }, [activeCanvas]);
+  }, [activeCanvas, getActiveCanvas]);
 
   // 📝 Adds Text Only to 2D Canvas Workspace
   const addTextPreset = (sizeStyle) => {
-    if (!activeCanvas) return;
+    const canvas = activeCanvas || getActiveCanvas();
+    if (!canvas) return;
     let textProps = { ...DEFAULT_TEXT_CONFIG };
 
     switch (sizeStyle) {
@@ -248,17 +250,17 @@ export default function TypographyPanel({ manualSync }) {
 
     const textbox = new fabric.Textbox(textProps.text, {
       ...textProps,
-      left: activeCanvas.width / 2,
-      top: activeCanvas.height / 2,
+      left: canvas.width / 2,
+      top: canvas.height / 2,
       width: 250,
       originX: "center",
       originY: "center",
       editable: true,
     });
 
-    activeCanvas.add(textbox);
-    activeCanvas.setActiveObject(textbox);
-    activeCanvas.renderAll();
+    canvas.add(textbox);
+    canvas.setActiveObject(textbox);
+    canvas.renderAll();
     setSelectedTextObject(textbox);
   };
 

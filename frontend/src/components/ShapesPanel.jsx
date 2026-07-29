@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 
 export default function ShapesPanel({ manualSync }) {
-  const { activeCanvas } = useCanvas();
+  const { activeCanvas, getActiveCanvas } = useCanvas();
   const [selectedShape, setSelectedShape] = useState(null);
 
   // Dynamic Custom Polygon Sides Input State
@@ -30,10 +30,11 @@ export default function ShapesPanel({ manualSync }) {
 
   // Sync state when active canvas selection updates
   useEffect(() => {
-    if (!activeCanvas) return;
+    const canvas = activeCanvas || getActiveCanvas();
+    if (!canvas) return;
 
     const updateShapeControls = (e) => {
-      let activeObj = e?.target || activeCanvas.getActiveObject();
+      let activeObj = e?.target || canvas.getActiveObject();
 
       if (activeObj && activeObj.type === "activeSelection") {
         activeObj = activeObj.getObjects()[0];
@@ -44,48 +45,40 @@ export default function ShapesPanel({ manualSync }) {
         return;
       }
 
-      const isText = activeObj.type === "textbox" || activeObj.type === "text" || activeObj.isType?.("Text") || activeObj.isType?.("Textbox");
-
-      if (activeObj && !isText) {
+      const shapeTypes = ["rect", "circle", "triangle", "line", "polygon", "path"];
+      if (shapeTypes.includes(activeObj.type)) {
         setSelectedShape(activeObj);
-        
-        const isLineType = activeObj.type === "line" || activeObj.isType?.("Line");
-        if (isLineType) {
-          setTempShapeColor(activeObj.get("stroke") || "#3b82f6");
-        } else {
-          setTempShapeColor(activeObj.get("fill") || "#3b82f6");
-        }
-        setTempBorderColor(activeObj.get("stroke") || "#000000");
-        setTempBorderWidth(activeObj.get("strokeWidth") || 0);
+        setTempShapeColor(activeObj.fill || "#3b82f6");
+        setTempBorderColor(activeObj.stroke || "#000000");
+        setTempBorderWidth(activeObj.strokeWidth || 0);
       } else {
         setSelectedShape(null);
       }
     };
 
-    activeCanvas.on("selection:created", updateShapeControls);
-    activeCanvas.on("selection:updated", updateShapeControls);
-    activeCanvas.on("selection:cleared", () => setSelectedShape(null));
-    activeCanvas.on("canvas:cleared", () => setSelectedShape(null));
+    canvas.on("selection:created", updateShapeControls);
+    canvas.on("selection:updated", updateShapeControls);
+    canvas.on("selection:cleared", () => setSelectedShape(null));
 
-    const currentActive = activeCanvas.getActiveObject();
-    if (currentActive) {
-      updateShapeControls({ target: currentActive });
-    }
+    const currentObj = canvas.getActiveObject();
+    if (currentObj) updateShapeControls({ target: currentObj });
 
     return () => {
-      activeCanvas.off("selection:created", updateShapeControls);
-      activeCanvas.off("selection:updated", updateShapeControls);
+      canvas.off("selection:created", updateShapeControls);
+      canvas.off("selection:updated", updateShapeControls);
+      canvas.off("selection:cleared", () => setSelectedShape(null));
     };
-  }, [activeCanvas]);
+  }, [activeCanvas, getActiveCanvas]);
 
   // 🛠️ Dynamic Shape Engine (Supports native presets + Custom Math generation)
   const addShape = (shapeType) => {
-    if (!activeCanvas) return;
+    const canvas = activeCanvas || getActiveCanvas();
+    if (!canvas) return;
 
     let shapeObj;
     const baseConfig = {
-      left: activeCanvas.width / 2,
-      top: activeCanvas.height / 2,
+      left: canvas.width / 2,
+      top: canvas.height / 2,
       fill: "#3b82f6",
       stroke: "#000000",
       strokeWidth: 0,
@@ -166,9 +159,9 @@ export default function ShapesPanel({ manualSync }) {
         return;
     }
 
-    activeCanvas.add(shapeObj);
-    activeCanvas.setActiveObject(shapeObj);
-    activeCanvas.renderAll();
+    canvas.add(shapeObj);
+    canvas.setActiveObject(shapeObj);
+    canvas.renderAll();
     
     setSelectedShape(shapeObj); 
     setTempShapeColor("#3b82f6");
