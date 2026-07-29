@@ -32,7 +32,7 @@ import { store } from './store'
 
 const App = () => {
   return (
-    <>
+    <div className="w-full min-h-screen flex flex-col overflow-x-hidden relative bg-white">
       <Toaster
         position="top-center"
         toastOptions={{
@@ -92,7 +92,7 @@ const App = () => {
           </CartProvider>
         </AuthProvider>
       </Provider>
-    </>
+    </div>
   )
 }
 

@@ -16,7 +16,7 @@ const Home = () => {
       
       {/* ── HERO SECTION ── */}
       {/* Bundled both heroes into a semantic header wrapper with a subtle background transition */}
-      <header className="relative w-full bg-gradient-to-b from-white to-stone-50/30">
+      <header className="relative w-full bg-gradient-to-b from-white to-stone-50/30 overflow-hidden">
         <Hero />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <hr className="border-stone-200/60" />
@@ -25,7 +25,7 @@ const Home = () => {
       </header>
 
       
-      <main className="flex-grow">
+      <main className="flex-grow overflow-hidden">
         
         {/* Category Browsing */}
         <section className="py-12 sm:py-16 md:py-20 bg-white border-y border-stone-100">

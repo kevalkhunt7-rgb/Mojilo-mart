@@ -158,7 +158,7 @@ const CustomHero = () => {
       `}</style>
 
       <main className="relative w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 sm:pt-12 lg:pt-16 pb-10 lg:pb-20
-                       grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10 items-center">
+                       grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10 items-center overflow-hidden">
 
         {/* ambient background blobs */}
         <div className="pointer-events-none absolute -top-10 left-1/4 w-72 h-72 rounded-full bg-amber-300/20 blur-3xl cs-blob" />
