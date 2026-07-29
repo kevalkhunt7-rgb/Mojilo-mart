@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useCanvas } from "../context/CanvasContext";
-import { Move, Layers, Lock, Unlock, Copy, Trash2, Sliders, Ruler } from "lucide-react";
+import { Move, Layers, Lock, Unlock, Copy, Trash2, Sliders, Ruler, X } from "lucide-react";
 
-export default function ObjectInspector() {
+export default function ObjectInspector({ onClose }) {
   const { activeCanvas, selectedObject, deleteLayer } = useCanvas();
   
   const [coords, setCoords] = useState({ x: 0, y: 0 });
@@ -46,7 +46,7 @@ export default function ObjectInspector() {
 
   if (!selectedObject || !activeCanvas) {
     return (
-      <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-4 text-center text-xs text-slate-400">
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200/80 dark:border-slate-700 shadow-sm p-4 text-center text-xs text-slate-400 dark:text-slate-500">
         Select an element on the canvas to inspect its properties.
       </div>
     );
@@ -148,38 +148,48 @@ export default function ObjectInspector() {
   const areaSqInches = (parseFloat(widthInches) * parseFloat(heightInches)).toFixed(1);
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-4 w-full space-y-4 -mt-16 md:-mt-12">
+    <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200/80 dark:border-slate-700 shadow-sm p-4 w-full space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-        <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-          <Sliders className="h-4.5 w-4.5 text-slate-700" />
+      <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-3">
+        <span className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+          <Sliders className="h-4.5 w-4.5 text-slate-700 dark:text-slate-300" />
           Object Inspector
         </span>
-        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 uppercase">
-          {selectedObject.type}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 uppercase">
+            {selectedObject.type}
+          </span>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="w-6 h-6 flex items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-300 transition-colors cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Coordinates (X, Y) */}
       <div className="space-y-1.5">
-        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Position (Pixels)</label>
+        <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide">Position (Pixels)</label>
         <div className="grid grid-cols-2 gap-2">
-          <div className="flex items-center bg-slate-50 border border-slate-200 rounded-lg px-2 h-9">
-            <span className="text-[10px] font-bold text-slate-400 mr-2">X</span>
+          <div className="flex items-center bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg px-2 h-9">
+            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mr-2">X</span>
             <input
               type="number"
               value={coords.x}
               onChange={(e) => handleCoordChange("x", e.target.value)}
-              className="w-full text-xs font-semibold bg-transparent outline-none text-slate-700"
+              className="w-full text-xs font-semibold bg-transparent outline-none text-slate-700 dark:text-slate-200"
             />
           </div>
-          <div className="flex items-center bg-slate-50 border border-slate-200 rounded-lg px-2 h-9">
-            <span className="text-[10px] font-bold text-slate-400 mr-2">Y</span>
+          <div className="flex items-center bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg px-2 h-9">
+            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mr-2">Y</span>
             <input
               type="number"
               value={coords.y}
               onChange={(e) => handleCoordChange("y", e.target.value)}
-              className="w-full text-xs font-semibold bg-transparent outline-none text-slate-700"
+              className="w-full text-xs font-semibold bg-transparent outline-none text-slate-700 dark:text-slate-200"
             />
           </div>
         </div>
@@ -188,11 +198,11 @@ export default function ObjectInspector() {
       {/* Dimensions (W, H, Lock Aspect) with live inch readout */}
       <div className="space-y-1.5">
         <div className="flex items-center justify-between">
-          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Dimensions</label>
+          <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide">Dimensions</label>
           <button 
             onClick={toggleLockAspect}
             className={`flex items-center gap-1 text-[10px] font-semibold transition-colors cursor-pointer ${
-              lockAspect ? "text-violet-600" : "text-slate-400 hover:text-slate-600"
+              lockAspect ? "text-violet-600 dark:text-violet-400" : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
             }`}
           >
             {lockAspect ? (
@@ -209,33 +219,33 @@ export default function ObjectInspector() {
         <div className="grid grid-cols-2 gap-2">
           {/* Width */}
           <div className="space-y-0.5">
-            <div className="flex items-center bg-slate-50 border border-slate-200 rounded-lg px-2 h-9">
-              <span className="text-[10px] font-bold text-slate-400 mr-2">W</span>
+            <div className="flex items-center bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg px-2 h-9">
+              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mr-2">W</span>
               <input
                 type="number"
                 value={dims.w}
                 onChange={(e) => handleDimChange("w", e.target.value)}
-                className="w-full text-xs font-semibold bg-transparent outline-none text-slate-700"
+                className="w-full text-xs font-semibold bg-transparent outline-none text-slate-700 dark:text-slate-200"
               />
-              <span className="text-[9px] font-medium text-slate-400 ml-1 whitespace-nowrap">px</span>
+              <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 ml-1 whitespace-nowrap">px</span>
             </div>
-            <div className="text-[10px] font-bold text-[#997241] text-center tracking-wide">
+            <div className="text-[10px] font-bold text-[#997241] dark:text-[#d4af37] text-center tracking-wide">
               {widthInches}"
             </div>
           </div>
           {/* Height */}
           <div className="space-y-0.5">
-            <div className="flex items-center bg-slate-50 border border-slate-200 rounded-lg px-2 h-9">
-              <span className="text-[10px] font-bold text-slate-400 mr-2">H</span>
+            <div className="flex items-center bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg px-2 h-9">
+              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mr-2">H</span>
               <input
                 type="number"
                 value={dims.h}
                 onChange={(e) => handleDimChange("h", e.target.value)}
-                className="w-full text-xs font-semibold bg-transparent outline-none text-slate-700"
+                className="w-full text-xs font-semibold bg-transparent outline-none text-slate-700 dark:text-slate-200"
               />
-              <span className="text-[9px] font-medium text-slate-400 ml-1 whitespace-nowrap">px</span>
+              <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 ml-1 whitespace-nowrap">px</span>
             </div>
-            <div className="text-[10px] font-bold text-[#997241] text-center tracking-wide">
+            <div className="text-[10px] font-bold text-[#997241] dark:text-[#d4af37] text-center tracking-wide">
               {heightInches}"
             </div>
           </div>
@@ -243,12 +253,12 @@ export default function ObjectInspector() {
       </div>
 
       {/* Live Print Size Badge */}
-      <div className="flex items-center justify-center gap-2 p-2.5 bg-[#f2ece6] border border-violet-200/60 rounded-xl">
-        <Ruler className="h-3.5 w-3.5 text-[#997241]" />
-        <span className="text-[11px] font-extrabold text-[#997241] tracking-wide">
+      <div className="flex items-center justify-center gap-2 p-2.5 bg-[#f2ece6] dark:bg-amber-950/30 border border-violet-200/60 dark:border-amber-800/40 rounded-xl">
+        <Ruler className="h-3.5 w-3.5 text-[#997241] dark:text-[#d4af37]" />
+        <span className="text-[11px] font-extrabold text-[#997241] dark:text-[#d4af37] tracking-wide">
           {widthInches}" × {heightInches}"
         </span>
-        <span className="text-[9px] font-semibold text-[#997241]">
+        <span className="text-[9px] font-semibold text-[#997241] dark:text-[#d4af37]">
           ({areaSqInches} in²)
         </span>
       </div>
@@ -256,7 +266,7 @@ export default function ObjectInspector() {
       {/* Rotation & Opacity */}
       <div className="grid grid-cols-2 gap-3.5 pt-2">
         <div className="space-y-1.5">
-          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Angle</label>
+          <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide">Angle</label>
           <input
             type="range"
             min="0"
@@ -265,10 +275,10 @@ export default function ObjectInspector() {
             onChange={(e) => handleRotationChange(e.target.value)}
             className="w-full accent-[#997241] cursor-pointer"
           />
-          <div className="text-[10px] font-semibold text-slate-500 text-right">{rotation}°</div>
+          <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 text-right">{rotation}°</div>
         </div>
         <div className="space-y-1.5">
-          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Opacity</label>
+          <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide">Opacity</label>
           <input
             type="range"
             min="0.1"
@@ -278,21 +288,24 @@ export default function ObjectInspector() {
             onChange={(e) => handleOpacityChange(e.target.value)}
             className="w-full accent-[#997241] cursor-pointer"
           />
-          <div className="text-[10px] font-semibold text-slate-500 text-right">{Math.round(opacity * 100)}%</div>
+          <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 text-right">{Math.round(opacity * 100)}%</div>
         </div>
       </div>
 
       {/* Actions (Duplicate / Delete) */}
-      <div className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-3">
+      <div className="grid grid-cols-2 gap-2 border-t border-slate-100 dark:border-slate-700 pt-3">
         <button
           onClick={duplicateObject}
-          className="flex items-center justify-center gap-1.5 h-9 bg-slate-50 border border-slate-200 text-slate-600 hover:text-violet-600 hover:border-violet-100 hover:bg-violet-50/50 rounded-lg text-xs font-semibold transition-colors cursor-pointer active:scale-95"
+          className="flex items-center justify-center gap-1.5 h-9 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-200 hover:text-violet-600 hover:border-violet-100 dark:hover:text-violet-400 hover:bg-violet-50/50 dark:hover:bg-slate-600/80 rounded-lg text-xs font-semibold transition-colors cursor-pointer active:scale-95"
         >
           <Copy className="h-3.5 w-3.5" /> Duplicate
         </button>
         <button
-          onClick={() => deleteLayer(selectedObject)}
-          className="flex items-center justify-center gap-1.5 h-9 bg-rose-50 border border-rose-200 text-rose-600 hover:text-white hover:bg-rose-600 hover:border-rose-600 rounded-lg text-xs font-semibold transition-colors cursor-pointer active:scale-95"
+          onClick={() => {
+            deleteLayer(selectedObject);
+            if (onClose) onClose();
+          }}
+          className="flex items-center justify-center gap-1.5 h-9 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-400 hover:text-white hover:bg-rose-600 dark:hover:bg-rose-600 hover:border-rose-600 rounded-lg text-xs font-semibold transition-colors cursor-pointer active:scale-95"
         >
           <Trash2 className="h-3.5 w-3.5" /> Delete
         </button>
@@ -301,3 +314,4 @@ export default function ObjectInspector() {
     </div>
   );
 }
+

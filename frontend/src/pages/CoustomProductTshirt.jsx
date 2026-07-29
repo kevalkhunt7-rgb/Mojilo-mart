@@ -34,7 +34,8 @@ import {
   Eye,
   Move,
   LogIn,
-  ShieldAlert
+  ShieldAlert,
+  Sliders
 } from "lucide-react";
 
 // Components
@@ -470,6 +471,7 @@ export default function CoustomProductTshirt() {
   // Mobile "View Costing" popup — keeps the price breakdown out of the
   // way so the garment view has full screen real estate by default.
   const [showCostingModal, setShowCostingModal] = useState(false);
+  const [showObjectInspectorModal, setShowObjectInspectorModal] = useState(false);
 
   const handleMobileToggleView = () => {
     setMobileMainView((v) => (v === "editor" ? "preview" : "editor"));
@@ -499,6 +501,7 @@ export default function CoustomProductTshirt() {
     activeCanvas,
     canvasLayers,
     setSelectedObject,
+    selectedObject,
     deleteLayer
   } = useCanvas();
 
@@ -1738,8 +1741,10 @@ export default function CoustomProductTshirt() {
                 showRulers={showRulers}
               />
             </div>
-            {/* Object coordinates inspector panel */}
-            <ObjectInspector />
+            {/* Object coordinates inspector panel - DESKTOP ONLY */}
+            <div className="hidden lg:block w-full p-4 pt-0">
+              <ObjectInspector />
+            </div>
           </div>
         </aside>
 
@@ -1804,6 +1809,55 @@ export default function CoustomProductTshirt() {
               <Shirt className="h-4.5 w-4.5" />
               Add to Cart & Checkout
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================
+          MOBILE-ONLY floating Object Inspector action trigger pill
+          Appears on screen whenever an element is selected on mobile 2D view.
+          ======================================================== */}
+      {isMobile && selectedObject && mobileMainView === "editor" && (
+        <div className="lg:hidden fixed bottom-28 right-4 z-40 flex items-center gap-1.5 p-1 bg-slate-900/90 dark:bg-slate-800/95 backdrop-blur border border-slate-700/60 rounded-full shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <button
+            onClick={() => setShowObjectInspectorModal(true)}
+            className="flex items-center gap-2 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-full text-xs font-bold transition-transform active:scale-95 cursor-pointer shadow-md"
+          >
+            <Sliders className="h-3.5 w-3.5" />
+            <span>Inspect</span>
+            <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full font-semibold uppercase truncate max-w-[80px]">
+              {selectedObject.type}
+            </span>
+          </button>
+          <button
+            onClick={() => {
+              if (activeCanvas?.discardActiveObject) {
+                activeCanvas.discardActiveObject();
+                activeCanvas.renderAll();
+              }
+            }}
+            title="Deselect element"
+            className="w-7 h-7 flex items-center justify-center rounded-full text-slate-400 hover:text-white hover:bg-slate-700/60 transition-colors cursor-pointer"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* ========================================================
+          MOBILE-ONLY Object Inspector Popup Modal
+          Opens on demand when tapping "Inspect" floating pill or button.
+          ======================================================== */}
+      {showObjectInspectorModal && isMobile && (
+        <div
+          className="lg:hidden fixed inset-0 z-[70] flex items-end justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setShowObjectInspectorModal(false)}
+        >
+          <div
+            className="w-full max-h-[85vh] overflow-y-auto bg-white dark:bg-slate-800 rounded-t-2xl shadow-[0_-4px_24px_rgba(0,0,0,0.2)] p-4 pb-8"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <ObjectInspector onClose={() => setShowObjectInspectorModal(false)} />
           </div>
         </div>
       )}
