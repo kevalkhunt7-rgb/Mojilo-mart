@@ -530,15 +530,14 @@ export default function CoustomProductTshirt() {
   const lastCurrentProductRef = useRef(null);
   const hasResetOnMountRef = useRef(false);
 
-  // 1. Initial mount & apparelId change reset: Wipe cached designer state ONCE per page visit or product switch
+  // 1. Product switch reset: Wipe cached designer state ONLY when navigating to a different product
   useEffect(() => {
-    if (!hasResetOnMountRef.current || (apparelId && apparelId !== lastApparelIdRef.current)) {
+    if (apparelId && lastApparelIdRef.current !== null && apparelId !== lastApparelIdRef.current) {
       clearDesignerStorage();
       resetCanvases();
       resetHistory();
       setJerseyPlayerName("");
       setJerseyPlayerNumber("");
-      hasResetOnMountRef.current = true;
     }
   }, [apparelId, resetCanvases, resetHistory, setJerseyPlayerName, setJerseyPlayerNumber]);
 
