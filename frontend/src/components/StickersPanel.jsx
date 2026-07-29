@@ -22,7 +22,7 @@ const STICKER_TEMPLATES = [
 ];
 
 export default function StickersPanel({ manualSync }) {
-  const { activeCanvas } = useCanvas();
+  const { activeCanvas, getActiveCanvas } = useCanvas();
   const [cliparts, setCliparts] = useState([]);
   const [customDesigns, setCustomDesigns] = useState([]);
   const [loading, setLoading] = useState(true);
