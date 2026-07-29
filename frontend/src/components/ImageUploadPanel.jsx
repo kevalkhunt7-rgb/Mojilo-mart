@@ -34,12 +34,13 @@ export default function ImageUploadPanel() {
     const fetchUserUploads = async () => {
       setFetching(true);
       try {
-        const response = await api.get("/uploads");
-        if (response.data && response.data.data) {
-          const apiUploads = response.data.data.map((item) => ({
-            id: item._id,
-            thumbnail: item.url,
-            name: item.filename || "Uploaded Image",
+        const response = await api.get("/uploads/my-uploads");
+        const uploadsData = response.data?.data || response.data || [];
+        if (Array.isArray(uploadsData)) {
+          const apiUploads = uploadsData.map((item) => ({
+            id: item._id || item.id,
+            thumbnail: item.url || item.imageUrl,
+            name: item.filename || item.name || "Uploaded Image",
             isPersisted: true,
           }));
           setUploads(apiUploads);
@@ -54,7 +55,7 @@ export default function ImageUploadPanel() {
     fetchUserUploads();
   }, [isAuthenticated]);
 
-  const handleFileChange = async (e) => {
+  const handleFileSelect = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -75,19 +76,22 @@ export default function ImageUploadPanel() {
         const formData = new FormData();
         formData.append("image", file);
 
-        const response = await api.post("/uploads", formData, {
+        const response = await api.post("/uploads/image", formData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
 
-        if (response.data && response.data.data) {
+        const resData = response.data?.data || response.data;
+        const uploadedUrl = resData?.url || resData?.imageUrl;
+
+        if (resData && uploadedUrl) {
           const newUpload = {
-            id: response.data.data._id,
-            thumbnail: response.data.data.url,
+            id: resData._id || resData.id || Date.now().toString(),
+            thumbnail: uploadedUrl,
             name: file.name,
             isPersisted: true,
           };
           setUploads((prev) => [newUpload, ...prev]);
-          handleAddToCanvas(response.data.data.url);
+          handleAddToCanvas(uploadedUrl);
           toast.success("Image uploaded & saved to your account!");
         }
       } else {
