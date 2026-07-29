@@ -239,7 +239,45 @@ export function CartItem3DViewer({ item }) {
         }
     }, [item]);
 
-    if (!item) return null;
+// Modern Timer replacement for deprecated THREE.Clock (Three.js r183+)
+class CartCanvasTimer {
+  constructor() {
+    if (THREE.Timer) {
+      this.timer = new THREE.Timer();
+    } else {
+      this.timer = null;
+      this._start = performance.now();
+      this._last = performance.now();
+    }
+    this.running = true;
+    this.autoStart = true;
+  }
+  start() {
+    this.running = true;
+  }
+  stop() {
+    this.running = false;
+  }
+  getElapsedTime() {
+    if (this.timer) {
+      this.timer.update();
+      return this.timer.getElapsed();
+    }
+    return (performance.now() - this._start) / 1000;
+  }
+  getDelta() {
+    if (this.timer) {
+      this.timer.update();
+      return this.timer.getDelta();
+    }
+    const now = performance.now();
+    const diff = (now - this._last) / 1000;
+    this._last = now;
+    return diff;
+  }
+}
+
+const cartCanvasTimer = new CartCanvasTimer();
 
     return (
         <div className="w-full h-full relative flex items-center justify-center overflow-hidden">
@@ -250,6 +288,7 @@ export function CartItem3DViewer({ item }) {
             )}
 
             <Canvas
+                clock={cartCanvasTimer}
                 camera={{ position: [0, -0.1, 12], fov: 38 }}
                 gl={{
                     antialias: true,

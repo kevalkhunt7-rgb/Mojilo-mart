@@ -3,6 +3,7 @@ import * as fabric from "fabric";
 import { useCanvas } from "../context/CanvasContext";
 import { Sparkles, Loader2, Plus, AlertTriangle, RefreshCw } from "lucide-react";
 import { loadCorsSafeImage } from "../utils/imageUtils";
+import { canvasSyncManager } from "../utils/canvasSyncManager";
 
 const STATUS = {
   IDLE: "idle",
@@ -80,8 +81,10 @@ export default function AIImageGenerator() {
         top: activeCanvas.height / 2,
         originX: "center",
         originY: "center",
+        crossOrigin: "anonymous",
       });
 
+      fabricImg.set({ crossOrigin: "anonymous" });
       fabricImg.scaleToWidth(140);
       fabricImg.isAIImage = true;
 
@@ -89,6 +92,8 @@ export default function AIImageGenerator() {
       activeCanvas.setActiveObject(fabricImg);
       activeCanvas.renderAll();
       activeCanvas.fire("object:modified");
+
+      canvasSyncManager.getCanvasTexture(activeCanvas);
     } catch (err) {
       console.error("[AIImageGenerator] Failed to place image on canvas:", err);
     }

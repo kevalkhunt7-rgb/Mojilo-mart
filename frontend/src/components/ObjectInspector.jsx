@@ -2,9 +2,12 @@ import React, { useEffect, useState } from "react";
 import { useCanvas } from "../context/CanvasContext";
 import { Move, Layers, Lock, Unlock, Copy, Trash2, Sliders, Ruler, X } from "lucide-react";
 
-export default function ObjectInspector({ onClose }) {
-  const { activeCanvas, selectedObject, deleteLayer } = useCanvas();
-  
+export default function ObjectInspector({ onClose, targetObject: propTargetObject }) {
+  const { activeCanvas, selectedObject: contextSelectedObject, deleteLayer } = useCanvas();
+
+  // Resolve target object: propTargetObject > contextSelectedObject > activeCanvas.getActiveObject()
+  const targetObject = propTargetObject || contextSelectedObject || (activeCanvas?.getActiveObject ? activeCanvas.getActiveObject() : null);
+
   const [coords, setCoords] = useState({ x: 0, y: 0 });
   const [dims, setDims] = useState({ w: 0, h: 0 });
   const [rotation, setRotation] = useState(0);
@@ -13,38 +16,46 @@ export default function ObjectInspector({ onClose }) {
 
   // Sync state with selected canvas object
   useEffect(() => {
-    if (!selectedObject) return;
+    if (!targetObject) return;
+
+    // Ensure activeCanvas keeps targetObject as selected active object
+    if (activeCanvas && typeof activeCanvas.setActiveObject === "function") {
+      if (activeCanvas.getActiveObject() !== targetObject) {
+        activeCanvas.setActiveObject(targetObject);
+        activeCanvas.renderAll();
+      }
+    }
 
     const updateInspectorState = () => {
       setCoords({
-        x: Math.round(selectedObject.left),
-        y: Math.round(selectedObject.top),
+        x: Math.round(targetObject.left),
+        y: Math.round(targetObject.top),
       });
       setDims({
-        w: Math.round(selectedObject.getScaledWidth()),
-        h: Math.round(selectedObject.getScaledHeight()),
+        w: Math.round(targetObject.getScaledWidth ? targetObject.getScaledWidth() : targetObject.width * (targetObject.scaleX || 1)),
+        h: Math.round(targetObject.getScaledHeight ? targetObject.getScaledHeight() : targetObject.height * (targetObject.scaleY || 1)),
       });
-      setRotation(Math.round(selectedObject.angle || 0));
-      setOpacity(selectedObject.opacity || 1);
-      setLockAspect(selectedObject.lockUniScaling || false);
+      setRotation(Math.round(targetObject.angle || 0));
+      setOpacity(targetObject.opacity ?? 1);
+      setLockAspect(targetObject.lockUniScaling || false);
     };
 
     // Update coordinates while items move/scale
-    selectedObject.on("moving", updateInspectorState);
-    selectedObject.on("scaling", updateInspectorState);
-    selectedObject.on("rotating", updateInspectorState);
+    targetObject.on("moving", updateInspectorState);
+    targetObject.on("scaling", updateInspectorState);
+    targetObject.on("rotating", updateInspectorState);
 
     // Initial load
     updateInspectorState();
 
     return () => {
-      selectedObject.off("moving", updateInspectorState);
-      selectedObject.off("scaling", updateInspectorState);
-      selectedObject.off("rotating", updateInspectorState);
+      targetObject.off("moving", updateInspectorState);
+      targetObject.off("scaling", updateInspectorState);
+      targetObject.off("rotating", updateInspectorState);
     };
-  }, [selectedObject]);
+  }, [targetObject, activeCanvas]);
 
-  if (!selectedObject || !activeCanvas) {
+  if (!targetObject || !activeCanvas) {
     return (
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200/80 dark:border-slate-700 shadow-sm p-4 text-center text-xs text-slate-400 dark:text-slate-500">
         Select an element on the canvas to inspect its properties.
@@ -55,8 +66,8 @@ export default function ObjectInspector({ onClose }) {
   // Handle properties change
   const handleCoordChange = (axis, val) => {
     const numVal = parseFloat(val) || 0;
-    selectedObject.set(axis === "x" ? "left" : "top", numVal);
-    selectedObject.setCoords();
+    targetObject.set(axis === "x" ? "left" : "top", numVal);
+    targetObject.setCoords();
     activeCanvas.renderAll();
     activeCanvas.fire("object:modified");
     setCoords({ ...coords, [axis]: numVal });
@@ -65,47 +76,47 @@ export default function ObjectInspector({ onClose }) {
   const handleDimChange = (dimension, val) => {
     const numVal = parseFloat(val) || 1;
     if (dimension === "w") {
-      const originalW = selectedObject.width;
+      const originalW = targetObject.width;
       const newScaleX = numVal / originalW;
       
       if (lockAspect) {
-        const ratio = selectedObject.scaleY / selectedObject.scaleX;
-        selectedObject.set({
+        const ratio = targetObject.scaleY / targetObject.scaleX;
+        targetObject.set({
           scaleX: newScaleX,
           scaleY: newScaleX * ratio,
         });
       } else {
-        selectedObject.set("scaleX", newScaleX);
+        targetObject.set("scaleX", newScaleX);
       }
     } else {
-      const originalH = selectedObject.height;
+      const originalH = targetObject.height;
       const newScaleY = numVal / originalH;
 
       if (lockAspect) {
-        const ratio = selectedObject.scaleX / selectedObject.scaleY;
-        selectedObject.set({
+        const ratio = targetObject.scaleX / targetObject.scaleY;
+        targetObject.set({
           scaleY: newScaleY,
           scaleX: newScaleY * ratio,
         });
       } else {
-        selectedObject.set("scaleY", newScaleY);
+        targetObject.set("scaleY", newScaleY);
       }
     }
     
-    selectedObject.setCoords();
+    targetObject.setCoords();
     activeCanvas.renderAll();
     activeCanvas.fire("object:modified");
     
     setDims({
-      w: Math.round(selectedObject.getScaledWidth()),
-      h: Math.round(selectedObject.getScaledHeight()),
+      w: Math.round(targetObject.getScaledWidth ? targetObject.getScaledWidth() : targetObject.width * (targetObject.scaleX || 1)),
+      h: Math.round(targetObject.getScaledHeight ? targetObject.getScaledHeight() : targetObject.height * (targetObject.scaleY || 1)),
     });
   };
 
   const handleRotationChange = (val) => {
     const numVal = parseFloat(val) || 0;
-    selectedObject.set("angle", numVal);
-    selectedObject.setCoords();
+    targetObject.set("angle", numVal);
+    targetObject.setCoords();
     activeCanvas.renderAll();
     activeCanvas.fire("object:modified");
     setRotation(numVal);
@@ -113,7 +124,7 @@ export default function ObjectInspector({ onClose }) {
 
   const handleOpacityChange = (val) => {
     const numVal = parseFloat(val);
-    selectedObject.set("opacity", numVal);
+    targetObject.set("opacity", numVal);
     activeCanvas.renderAll();
     activeCanvas.fire("object:modified");
     setOpacity(numVal);
@@ -121,7 +132,7 @@ export default function ObjectInspector({ onClose }) {
 
   const toggleLockAspect = () => {
     const newLock = !lockAspect;
-    selectedObject.set({
+    targetObject.set({
       lockUniScaling: newLock,
       uniformScaling: newLock,
     });
@@ -130,10 +141,10 @@ export default function ObjectInspector({ onClose }) {
   };
 
   const duplicateObject = () => {
-    selectedObject.clone((clonedObj) => {
+    targetObject.clone((clonedObj) => {
       clonedObj.set({
-        left: selectedObject.left + 20,
-        top: selectedObject.top + 20,
+        left: targetObject.left + 20,
+        top: targetObject.top + 20,
       });
       activeCanvas.add(clonedObj);
       activeCanvas.setActiveObject(clonedObj);
@@ -157,7 +168,7 @@ export default function ObjectInspector({ onClose }) {
         </span>
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 uppercase">
-            {selectedObject.type}
+            {targetObject.type}
           </span>
           {onClose && (
             <button
@@ -302,7 +313,7 @@ export default function ObjectInspector({ onClose }) {
         </button>
         <button
           onClick={() => {
-            deleteLayer(selectedObject);
+            deleteLayer(targetObject);
             if (onClose) onClose();
           }}
           className="flex items-center justify-center gap-1.5 h-9 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-400 hover:text-white hover:bg-rose-600 dark:hover:bg-rose-600 hover:border-rose-600 rounded-lg text-xs font-semibold transition-colors cursor-pointer active:scale-95"

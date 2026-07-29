@@ -425,17 +425,21 @@ function SingleCanvasViewport({ view, printArea, manualSync, isSelected, current
       const reader = new FileReader();
       reader.onload = (event) => {
         const imgObj = new Image();
+        imgObj.crossOrigin = "anonymous";
         imgObj.src = event.target.result;
         imgObj.onload = () => {
-          const image = new fabric.Image(imgObj);
+          const image = new fabric.Image(imgObj, { crossOrigin: "anonymous" });
           image.scaleToWidth(150);
           image.set({
             left: boxLeft + (boxSize - 150) / 2,
             top: boxTop + (boxSize - image.getScaledHeight()) / 2,
+            crossOrigin: "anonymous",
           });
           canvas.add(image);
           canvas.setActiveObject(image);
           canvas.renderAll();
+          canvas.fire("object:modified");
+          canvasSyncManager.getCanvasTexture(canvas);
         };
       };
       reader.readAsDataURL(file);

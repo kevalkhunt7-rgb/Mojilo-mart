@@ -4,6 +4,7 @@ import { useCanvas } from "../context/CanvasContext";
 import api from "../lib/axios";
 import { Loader2, Search, Sparkles, Layers, Image as ImageIcon } from "lucide-react";
 import { loadCorsSafeImage } from "../utils/imageUtils";
+import { canvasSyncManager } from "../utils/canvasSyncManager";
 
 const STICKER_TEMPLATES = [
   { id: "star", name: "Retro Star", url: "https://img.icons8.com/fluency/96/star--v1.png" },
@@ -106,8 +107,10 @@ export default function StickersPanel({ manualSync }) {
         originX: "center",
         originY: "center",
         originalSrc: rawImgUrl,
+        crossOrigin: "anonymous",
       });
 
+      fabricImg.set({ crossOrigin: "anonymous" });
       fabricImg.scaleToWidth(120);
 
       activeCanvas.add(fabricImg);
@@ -115,6 +118,7 @@ export default function StickersPanel({ manualSync }) {
       activeCanvas.renderAll();
       activeCanvas.fire("object:modified");
 
+      canvasSyncManager.getCanvasTexture(activeCanvas);
       if (manualSync) manualSync();
     } catch (err) {
       console.error("Failed to add sticker to canvas:", err);

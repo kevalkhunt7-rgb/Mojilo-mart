@@ -5,6 +5,8 @@ import { useCanvas } from "../context/CanvasContext";
 import { Upload, ImagePlus, Trash2, Loader2, Sparkles, Wand2 } from "lucide-react";
 import api from "../lib/axios";
 import { removeBackground } from "@imgly/background-removal";
+import { loadCorsSafeImage } from "../utils/imageUtils";
+import { canvasSyncManager } from "../utils/canvasSyncManager";
 
 export default function ImageUploadPanel() {
   const {
@@ -25,25 +27,25 @@ export default function ImageUploadPanel() {
   const token = localStorage.getItem("mojilo_accessToken");
   const isAuthenticated = !!token;
 
-  // Load user uploads if logged in
+  // Fetch persisted uploads if user is logged in
   useEffect(() => {
     if (!isAuthenticated) return;
 
     const fetchUserUploads = async () => {
       setFetching(true);
       try {
-        const response = await api.get("/uploads/my-uploads");
-        if (response.data && response.data.success) {
-          const formatted = response.data.data.map((item) => ({
-            id: item._id || item.id,
-            thumbnail: item.imageUrl,
-            name: item.imageUrl.split("/").pop() || "Uploaded Clipart",
-            isPersisted: true
+        const response = await api.get("/uploads");
+        if (response.data && response.data.data) {
+          const apiUploads = response.data.data.map((item) => ({
+            id: item._id,
+            thumbnail: item.url,
+            name: item.filename || "Uploaded Image",
+            isPersisted: true,
           }));
-          setUploads(formatted);
+          setUploads(apiUploads);
         }
       } catch (err) {
-        console.error("Failed to load your uploads:", err);
+        console.error("Failed to fetch user uploads:", err);
       } finally {
         setFetching(false);
       }
@@ -52,48 +54,55 @@ export default function ImageUploadPanel() {
     fetchUserUploads();
   }, [isAuthenticated]);
 
-  const handleFileSelect = async (e) => {
-    const files = Array.from(e.target.files || []);
-    if (!files.length) return;
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-    const file = files[0]; // Process one file at a time for database persistency
-    if (!file.type.startsWith("image/")) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload a valid image file (PNG, JPG, WEBP).");
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Image size exceeds 10MB limit.");
+      return;
+    }
 
     setLoading(true);
 
     try {
       if (isAuthenticated) {
-        // Upload to database
         const formData = new FormData();
         formData.append("image", file);
 
-        const response = await api.post("/uploads/image", formData, {
-          headers: {
-            "Content-Type": "multipart/form-data"
-          }
+        const response = await api.post("/uploads", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
         });
 
-        if (response.data && response.data.success) {
-          const newItem = response.data.data;
-          setUploads((prev) => [
-            {
-              id: newItem.id || newItem._id,
-              thumbnail: newItem.url,
-              name: file.name,
-              isPersisted: true
-            },
-            ...prev
-          ]);
+        if (response.data && response.data.data) {
+          const newUpload = {
+            id: response.data.data._id,
+            thumbnail: response.data.data.url,
+            name: file.name,
+            isPersisted: true,
+          };
+          setUploads((prev) => [newUpload, ...prev]);
+          handleAddToCanvas(response.data.data.url);
+          toast.success("Image uploaded & saved to your account!");
         }
       } else {
-        // Fall back to local FileReader storage for guests
         const reader = new FileReader();
         reader.onload = (event) => {
           const dataUrl = event.target.result;
-          setUploads((prev) => [
-            ...prev,
-            { id: Date.now() + Math.random(), thumbnail: dataUrl, name: file.name, isPersisted: false },
-          ]);
+          const newUpload = {
+            id: Date.now().toString(),
+            thumbnail: dataUrl,
+            name: file.name,
+            isPersisted: false,
+          };
+          setUploads((prev) => [newUpload, ...prev]);
+          handleAddToCanvas(dataUrl);
+          toast.success("Image added to canvas!");
         };
         reader.readAsDataURL(file);
       }
@@ -106,29 +115,32 @@ export default function ImageUploadPanel() {
     }
   };
 
-  const handleAddToCanvas = (dataUrl) => {
+  const handleAddToCanvas = async (dataUrl) => {
     if (!activeCanvas) return;
 
-    const imgEl = new Image();
-    imgEl.crossOrigin = "anonymous";
-    imgEl.src = dataUrl;
-
-    imgEl.onload = () => {
+    try {
+      const imgEl = await loadCorsSafeImage(dataUrl);
       const fabricImg = new fabric.Image(imgEl, {
         left: activeCanvas.width / 2,
         top: activeCanvas.height / 2,
         originX: "center",
         originY: "center",
         originalSrc: dataUrl,
+        crossOrigin: "anonymous",
       });
 
+      fabricImg.set({ crossOrigin: "anonymous" });
       fabricImg.scaleToWidth(Math.min(180, activeCanvas.width * 0.4));
 
       activeCanvas.add(fabricImg);
       activeCanvas.setActiveObject(fabricImg);
       activeCanvas.renderAll();
       activeCanvas.fire("object:modified");
-    };
+
+      canvasSyncManager.getCanvasTexture(activeCanvas);
+    } catch (err) {
+      console.error("Failed to add uploaded image to canvas:", err);
+    }
   };
 
   const handleRemoveUpload = async (id, isPersisted) => {
@@ -158,9 +170,11 @@ export default function ImageUploadPanel() {
             newImg.src = newSrc;
             newImg.onload = () => {
               obj.setElement(newImg);
+              obj.set({ crossOrigin: "anonymous" });
               obj.originalSrc = newSrc;
               cv.renderAll();
               cv.fire("object:modified");
+              canvasSyncManager.getCanvasTexture(cv);
             };
           }
         }

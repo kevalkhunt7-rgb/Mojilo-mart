@@ -2,20 +2,20 @@ import React, { useState } from "react";
 import * as fabric from "fabric";
 import { useCanvas } from "../context/CanvasContext";
 import { QrCode, Plus } from "lucide-react";
+import { canvasSyncManager } from "../utils/canvasSyncManager";
 
 export default function QrCodeGenerator() {
   const { activeCanvas } = useCanvas();
   const [text, setText] = useState("");
-  const [qrUrl, setQrUrl] = useState("");
+  const [qrUrl, setQrUrl] = useState(null);
 
   const handleGenerate = (e) => {
     e.preventDefault();
     if (!text.trim()) return;
 
     // Use qrserver api to generate a neat QR code graphic
-    const url = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(
-      text
-    )}`;
+    const encoded = encodeURIComponent(text.trim());
+    const url = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encoded}`;
     setQrUrl(url);
   };
 
@@ -32,14 +32,18 @@ export default function QrCodeGenerator() {
         top: activeCanvas.height / 2,
         originX: "center",
         originY: "center",
+        crossOrigin: "anonymous",
       });
 
+      fabricImg.set({ crossOrigin: "anonymous" });
       fabricImg.scaleToWidth(120);
 
       activeCanvas.add(fabricImg);
       activeCanvas.setActiveObject(fabricImg);
       activeCanvas.renderAll();
       activeCanvas.fire("object:modified");
+
+      canvasSyncManager.getCanvasTexture(activeCanvas);
     };
   };
 

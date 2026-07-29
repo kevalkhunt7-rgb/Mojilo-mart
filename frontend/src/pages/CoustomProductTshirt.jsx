@@ -472,6 +472,7 @@ export default function CoustomProductTshirt() {
   // way so the garment view has full screen real estate by default.
   const [showCostingModal, setShowCostingModal] = useState(false);
   const [showObjectInspectorModal, setShowObjectInspectorModal] = useState(false);
+  const [mobileInspectedObject, setMobileInspectedObject] = useState(null);
 
   const handleMobileToggleView = () => {
     setMobileMainView((v) => (v === "editor" ? "preview" : "editor"));
@@ -504,6 +505,12 @@ export default function CoustomProductTshirt() {
     selectedObject,
     deleteLayer
   } = useCanvas();
+
+  useEffect(() => {
+    if (selectedObject) {
+      setMobileInspectedObject(selectedObject);
+    }
+  }, [selectedObject]);
 
   const { resetCanvases } = useCanvas();
   const resetHistory = useCustomizerStore((state) => state.resetHistory);
@@ -632,9 +639,16 @@ export default function CoustomProductTshirt() {
         fabric.util.enlivenObjects(data)
           .then((objects) => {
             objects.forEach((obj) => {
+              if (obj.type === "image") {
+                obj.set({ crossOrigin: "anonymous" });
+                const el = obj.getElement();
+                if (el) el.crossOrigin = "anonymous";
+              }
               cv.add(obj);
             });
             cv.renderAll();
+            cv.fire("object:modified");
+            if (manualTriggerSync) manualTriggerSync(v);
           })
           .catch((err) => {
             console.error("Error enlivening objects during snapshot application:", err);
@@ -1817,20 +1831,35 @@ export default function CoustomProductTshirt() {
           MOBILE-ONLY floating Object Inspector action trigger pill
           Appears on screen whenever an element is selected on mobile 2D view.
           ======================================================== */}
-      {isMobile && selectedObject && mobileMainView === "editor" && (
+      {isMobile && (selectedObject || mobileInspectedObject) && mobileMainView === "editor" && (
         <div className="lg:hidden fixed bottom-28 right-4 z-40 flex items-center gap-1.5 p-1 bg-slate-900/90 dark:bg-slate-800/95 backdrop-blur border border-slate-700/60 rounded-full shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-300">
           <button
-            onClick={() => setShowObjectInspectorModal(true)}
+            onMouseDown={(e) => e.preventDefault()}
+            onTouchStart={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const targetObj = selectedObject || activeCanvas?.getActiveObject() || mobileInspectedObject;
+              if (targetObj) {
+                setMobileInspectedObject(targetObj);
+                if (activeCanvas && typeof activeCanvas.setActiveObject === "function") {
+                  activeCanvas.setActiveObject(targetObj);
+                  activeCanvas.renderAll();
+                }
+              }
+              setShowObjectInspectorModal(true);
+            }}
             className="flex items-center gap-2 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-full text-xs font-bold transition-transform active:scale-95 cursor-pointer shadow-md"
           >
             <Sliders className="h-3.5 w-3.5" />
             <span>Inspect</span>
             <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full font-semibold uppercase truncate max-w-[80px]">
-              {selectedObject.type}
+              {(selectedObject || mobileInspectedObject)?.type}
             </span>
           </button>
           <button
             onClick={() => {
+              setMobileInspectedObject(null);
               if (activeCanvas?.discardActiveObject) {
                 activeCanvas.discardActiveObject();
                 activeCanvas.renderAll();
@@ -1857,7 +1886,10 @@ export default function CoustomProductTshirt() {
             className="w-full max-h-[85vh] overflow-y-auto bg-white dark:bg-slate-800 rounded-t-2xl shadow-[0_-4px_24px_rgba(0,0,0,0.2)] p-4 pb-8"
             onClick={(e) => e.stopPropagation()}
           >
-            <ObjectInspector onClose={() => setShowObjectInspectorModal(false)} />
+            <ObjectInspector 
+              targetObject={mobileInspectedObject || selectedObject || activeCanvas?.getActiveObject()} 
+              onClose={() => setShowObjectInspectorModal(false)} 
+            />
           </div>
         </div>
       )}

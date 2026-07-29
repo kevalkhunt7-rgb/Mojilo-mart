@@ -71,9 +71,10 @@ const ToolBar = ({
     const reader = new FileReader();
     reader.onload = (event) => {
       const imgObj = new Image();
+      imgObj.crossOrigin = "anonymous";
       imgObj.src = event.target.result;
       imgObj.onload = () => {
-        const image = new fabric.Image(imgObj);
+        const image = new fabric.Image(imgObj, { crossOrigin: "anonymous" });
         const maxWidth = CANVAS_CONFIG.width * 0.5;
         const maxHeight = CANVAS_CONFIG.height * 0.5;
         if (image.width > maxWidth || image.height > maxHeight) {
@@ -83,10 +84,13 @@ const ToolBar = ({
         image.set({
           left: (activeCanvas.width - image.getScaledWidth()) / 2,
           top: (activeCanvas.height - image.getScaledHeight()) / 2,
+          crossOrigin: "anonymous",
         });
         activeCanvas.add(image);
         activeCanvas.setActiveObject(image);
         activeCanvas.renderAll();
+        activeCanvas.fire("object:modified");
+        canvasSyncManager.getCanvasTexture(activeCanvas);
       };
     };
     reader.readAsDataURL(file);

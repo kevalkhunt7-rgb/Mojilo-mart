@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
-import toast from 'react-hot-toast';
+import toast from "react-hot-toast";
 import { useCanvas } from "../context/CanvasContext";
+import { Wand2, Loader2, Sparkles, AlertCircle, RefreshCw } from "lucide-react";
 import { removeBackground } from "@imgly/background-removal";
-import { Wand2, Loader2, AlertCircle } from "lucide-react";
+import { canvasSyncManager } from "../utils/canvasSyncManager";
 
 export default function BackgroundRemovalPanel() {
   const {
@@ -12,29 +13,17 @@ export default function BackgroundRemovalPanel() {
     rightCanvas,
     pocketCanvas,
     hoodCanvas,
-    selectedObject
+    activeCanvas,
+    selectedObject,
   } = useCanvas();
 
   const [loading, setLoading] = useState(false);
   const [selectedSrc, setSelectedSrc] = useState(null);
 
-  const getObjectSrc = (obj) => {
-    if (!obj) return null;
-    if (obj.originalSrc) return obj.originalSrc;
-
-    const element = obj.getElement();
-    if (element && element.tagName === "IMG") {
-      return element.src || element.currentSrc;
-    }
-    if (obj._originalElement && obj._originalElement.src) {
-      return obj._originalElement.src;
-    }
-    return obj.src || null;
-  };
-
   useEffect(() => {
     if (selectedObject && selectedObject.type === "image") {
-      const src = getObjectSrc(selectedObject);
+      const el = selectedObject.getElement();
+      const src = selectedObject.originalSrc || (el ? el.src || el.currentSrc : null);
       setSelectedSrc(src);
     } else {
       setSelectedSrc(null);
@@ -42,11 +31,14 @@ export default function BackgroundRemovalPanel() {
   }, [selectedObject]);
 
   const getProxyUrl = (imgUrl) => {
-    if (!imgUrl) return '';
-    if (imgUrl.startsWith('data:') || imgUrl.includes('/uploads/proxy')) {
-      return imgUrl;
+    if (!imgUrl) return "";
+    if (imgUrl.startsWith("data:") || imgUrl.startsWith("blob:")) return imgUrl;
+    if (imgUrl.includes("/uploads/proxy")) return imgUrl;
+    const backendUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+    if (imgUrl.startsWith("/")) {
+      return `${backendUrl}${imgUrl}`;
     }
-    const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    const apiBase = (import.meta.env.VITE_API_URL || "http://localhost:5000/api").replace(/\/api$/, "") + "/api";
     return `${apiBase}/uploads/proxy?url=${encodeURIComponent(imgUrl)}`;
   };
 
@@ -66,9 +58,11 @@ export default function BackgroundRemovalPanel() {
             newImg.src = newSrc;
             newImg.onload = () => {
               obj.setElement(newImg);
+              obj.set({ crossOrigin: "anonymous" });
               obj.originalSrc = newSrc;
               cv.renderAll();
               cv.fire("object:modified");
+              canvasSyncManager.getCanvasTexture(cv);
             };
           }
         }

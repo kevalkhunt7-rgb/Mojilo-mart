@@ -187,8 +187,9 @@ const addFabricObject = (canvas, objectData) => {
       canvas.renderAll();
       break;
     case "Image":
-      if (!objectData.src || !objectData.src.startsWith("data:image")) return;
+      if (!objectData.src) return;
       const imgElement = new Image();
+      imgElement.crossOrigin = "anonymous";
       imgElement.src = objectData.src;
       imgElement.onload = () => {
         const fabricImg = new fabric.Image(imgElement, {
@@ -198,9 +199,13 @@ const addFabricObject = (canvas, objectData) => {
           scaleY: objectData.scaleY || 1,
           angle: objectData.angle || 0,
           opacity: objectData.opacity || 1,
+          crossOrigin: "anonymous",
         });
+        fabricImg.set({ crossOrigin: "anonymous" });
         canvas.add(fabricImg);
         canvas.renderAll();
+        canvas.fire("object:modified");
+        canvasSyncManager.getCanvasTexture(canvas);
       };
       break;
   }

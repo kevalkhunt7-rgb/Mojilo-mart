@@ -141,8 +141,47 @@ function CameraController({ view }) {
 }
 
 import * as THREE from "three";
-
 import { apparelConfig } from "../utils/apparelConfig";
+
+// Modern Timer replacement for deprecated THREE.Clock (Three.js r183+)
+class CanvasTimer {
+  constructor() {
+    if (THREE.Timer) {
+      this.timer = new THREE.Timer();
+    } else {
+      this.timer = null;
+      this._start = performance.now();
+      this._last = performance.now();
+    }
+    this.running = true;
+    this.autoStart = true;
+  }
+  start() {
+    this.running = true;
+  }
+  stop() {
+    this.running = false;
+  }
+  getElapsedTime() {
+    if (this.timer) {
+      this.timer.update();
+      return this.timer.getElapsed();
+    }
+    return (performance.now() - this._start) / 1000;
+  }
+  getDelta() {
+    if (this.timer) {
+      this.timer.update();
+      return this.timer.getDelta();
+    }
+    const now = performance.now();
+    const diff = (now - this._last) / 1000;
+    this._last = now;
+    return diff;
+  }
+}
+
+const customCanvasTimer = new CanvasTimer();
 
 export default function ThreeDViewer({
   modelComponent: ModelComponent,
@@ -212,6 +251,7 @@ export default function ThreeDViewer({
       {/* Main R3F Canvas Viewport Container */}
       <div className="flex-1 w-full h-full relative min-h-[380px]">
         <Canvas
+          clock={customCanvasTimer}
           camera={{
             position: [0, 0, 16],
             fov: 42,
