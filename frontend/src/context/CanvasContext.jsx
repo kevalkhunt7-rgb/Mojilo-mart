@@ -31,12 +31,15 @@ export const CanvasProvider = ({ children }) => {
   const setActiveCanvas = useCallback((canvasInstance) => {
     activeCanvasRef.current = canvasInstance;
     setActiveCanvasState(canvasInstance);
+    console.log(`🎯 [CanvasContext] SET ACTIVE CANVAS: ID = ${canvasInstance?.__canvas_id || "null"}`);
   }, []);
 
   // Immediate registration on canvas creation
   const registerCanvas = useCallback((view, canvasInstance, isSelected = false) => {
     if (!view || !canvasInstance) return;
     canvasMapRef.current[view] = canvasInstance;
+
+    console.log(`📌 [CanvasContext] REGISTER CANVAS: view = ${view}, ID = ${canvasInstance.__canvas_id}, isSelected = ${isSelected}`);
 
     if (view === "front") setFrontCanvas(canvasInstance);
     if (view === "back") setBackCanvas(canvasInstance);
@@ -49,6 +52,7 @@ export const CanvasProvider = ({ children }) => {
     if (isSelected || !activeCanvasRef.current) {
       activeCanvasRef.current = canvasInstance;
       setActiveCanvasState(canvasInstance);
+      console.log(`🚀 [CanvasContext] AUTO-ACTIVATED CANVAS: view = ${view}, ID = ${canvasInstance.__canvas_id}`);
     }
   }, []);
 
@@ -57,6 +61,7 @@ export const CanvasProvider = ({ children }) => {
     if (!view) return;
     const instance = canvasMapRef.current[view];
     canvasMapRef.current[view] = null;
+    console.log(`🗑️ [CanvasContext] UNREGISTER CANVAS: view = ${view}, ID = ${instance?.__canvas_id || "null"}`);
 
     if (view === "front") setFrontCanvas(null);
     if (view === "back") setBackCanvas(null);
@@ -73,10 +78,9 @@ export const CanvasProvider = ({ children }) => {
 
   // Synchronous fallback getter for tool panels
   const getActiveCanvas = useCallback(() => {
-    if (activeCanvasRef.current) return activeCanvasRef.current;
-    if (activeCanvasState) return activeCanvasState;
-    const map = canvasMapRef.current;
-    return map.front || map.back || map.left || map.right || map.pocket || map.hood || null;
+    const active = activeCanvasRef.current || activeCanvasState || canvasMapRef.current.front || canvasMapRef.current.back || canvasMapRef.current.left || canvasMapRef.current.right || canvasMapRef.current.pocket || canvasMapRef.current.hood || null;
+    console.log(`🔍 [CanvasContext] GET ACTIVE CANVAS resolved ID = ${active?.__canvas_id || "NONE"}`);
+    return active;
   }, [activeCanvasState]);
 
   // Track currently clicked/highlighted object on the active workspace

@@ -123,6 +123,7 @@ export default function ImageUploadPanel() {
   const handleAddToCanvas = async (dataUrl) => {
     const canvas = activeCanvas || getActiveCanvas();
     if (!canvas) return;
+    console.log(`🖼️ [ImageUploadPanel] Adding uploaded image to Canvas ID = ${canvas.__canvas_id}`);
 
     try {
       const imgEl = await loadCorsSafeImage(dataUrl);

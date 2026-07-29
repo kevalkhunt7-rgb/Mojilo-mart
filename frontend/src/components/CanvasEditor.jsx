@@ -10,19 +10,16 @@ import { Grid, Maximize, Compass } from "lucide-react";
 
 
 export function withGuidesHidden(canvas, captureFn) {
-  if (!canvas) {
-    console.warn("withGuidesHidden: Canvas not available");
+  if (!canvas || !canvas.getObjects) {
     return null;
   }
 
-  // Check if canvas is fully initialized
-  if (!canvas.getObjects) {
-    console.warn("withGuidesHidden: Canvas not fully initialized");
-    return null;
-  }
+  const guideItems = canvas.getObjects().filter((o) => o.excludeFromExport).map((o) => ({
+    obj: o,
+    wasVisible: o.visible
+  }));
 
-  const guides = canvas.getObjects().filter((o) => o.excludeFromExport);
-  guides.forEach((o) => o.set("visible", false));
+  guideItems.forEach(({ obj }) => obj.set("visible", false));
 
   try {
     if (canvas.requestRenderAll) {
@@ -30,7 +27,7 @@ export function withGuidesHidden(canvas, captureFn) {
     }
     return captureFn();
   } finally {
-    guides.forEach((o) => o.set("visible", true));
+    guideItems.forEach(({ obj, wasVisible }) => obj.set("visible", wasVisible));
     if (canvas.requestRenderAll) {
       canvas.requestRenderAll();
     }
@@ -235,6 +232,9 @@ function SingleCanvasViewport({ view, printArea, manualSync, isSelected, current
       preserveObjectStacking: true,
     });
 
+    canvas.__canvas_id = `fabric_${view}_${Math.random().toString(36).substring(2, 7)}`;
+    console.log(`🎨 [CanvasEditor] CREATED FABRIC CANVAS: view = ${view}, ID = ${canvas.__canvas_id}`);
+
     fabricCanvasRef.current = canvas;
 
     // Immediately register canvas into context and activate if this view is selected
@@ -309,8 +309,11 @@ function SingleCanvasViewport({ view, printArea, manualSync, isSelected, current
 
     // Boundary constraint logic (Restrict to the printable box)
     const clampPosition = (obj) => {
+      if (!obj) return;
       const width = obj.getScaledWidth();
       const height = obj.getScaledHeight();
+
+      if (!width || !height || !isFinite(width) || !isFinite(height)) return;
 
       let minX = boxLeft;
       let maxX = boxLeft + boxWidth - width;
@@ -326,10 +329,14 @@ function SingleCanvasViewport({ view, printArea, manualSync, isSelected, current
         maxY += height / 2;
       }
 
-      if (obj.left < minX) obj.left = minX;
-      if (obj.left > maxX) obj.left = maxX;
-      if (obj.top < minY) obj.top = minY;
-      if (obj.top > maxY) obj.top = maxY;
+      if (isFinite(minX) && isFinite(maxX) && obj.left !== undefined && isFinite(obj.left)) {
+        if (obj.left < minX) obj.left = minX;
+        if (obj.left > maxX) obj.left = maxX;
+      }
+      if (isFinite(minY) && isFinite(maxY) && obj.top !== undefined && isFinite(obj.top)) {
+        if (obj.top < minY) obj.top = minY;
+        if (obj.top > maxY) obj.top = maxY;
+      }
     };
 
     const handleObjectMoving = (e) => {
@@ -347,13 +354,14 @@ function SingleCanvasViewport({ view, printArea, manualSync, isSelected, current
     };
 
     const constrainToBox = (obj) => {
+      if (!obj || !obj.width || !obj.height || !isFinite(obj.width) || !isFinite(obj.height)) return;
       const width = obj.getScaledWidth();
       const height = obj.getScaledHeight();
 
-      if (width > boxWidth) {
+      if (width > boxWidth && obj.width > 0) {
         obj.scaleX = boxWidth / obj.width;
       }
-      if (height > boxHeight) {
+      if (height > boxHeight && obj.height > 0) {
         obj.scaleY = boxHeight / obj.height;
       }
 
@@ -393,6 +401,7 @@ function SingleCanvasViewport({ view, printArea, manualSync, isSelected, current
     canvas.on("object:added", (e) => {
       const obj = e.target;
       if (obj && obj !== printAreaBox && obj.name !== "guide-line") {
+        console.log(`➕ [CanvasEditor:object:added] Added object to Canvas ID = ${canvas.__canvas_id}, view = ${view}, type = ${obj.type}, width = ${obj.width}, height = ${obj.height}, scaleX = ${obj.scaleX}, scaleY = ${obj.scaleY}, left = ${obj.left}, top = ${obj.top}`);
         constrainToBox(obj);
         canvas.requestRenderAll();
         triggerSync();
@@ -545,10 +554,12 @@ function SingleCanvasViewport({ view, printArea, manualSync, isSelected, current
         {/* Garment silhouette background */}
         <GarmentSilhouette product={currentProduct} view={view} width={canvasWidth} height={canvasHeight} />
 
-        <canvas
-          ref={canvasRef}
-          className="relative z-10 block"
-        />
+        <div className="relative z-10">
+          <canvas
+            ref={canvasRef}
+            className="relative z-10 block"
+          />
+        </div>
       </div>
     </div>
   );

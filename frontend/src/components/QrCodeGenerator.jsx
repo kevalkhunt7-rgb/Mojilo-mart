@@ -22,6 +22,7 @@ export default function QrCodeGenerator() {
   const handleAddQrToCanvas = () => {
     const canvas = activeCanvas || getActiveCanvas();
     if (!canvas || !qrUrl) return;
+    console.log(`📱 [QrCodeGenerator] Adding QR code to Canvas ID = ${canvas.__canvas_id}`);
 
     const imgElement = new Image();
     imgElement.crossOrigin = "anonymous";

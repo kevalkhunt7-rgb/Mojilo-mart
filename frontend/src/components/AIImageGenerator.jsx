@@ -74,6 +74,7 @@ export default function AIImageGenerator() {
   const handleAddToCanvas = async () => {
     const canvas = activeCanvas || getActiveCanvas();
     if (!canvas || !generatedUrl) return;
+    console.log(`🤖 [AIImageGenerator] Adding AI image to Canvas ID = ${canvas.__canvas_id}`);
 
     try {
       const imgElement = await loadCorsSafeImage(generatedUrl);

@@ -13,7 +13,12 @@ export const loadCorsSafeImage = async (rawUrl) => {
     return new Promise((resolve, reject) => {
       const img = new Image();
       img.crossOrigin = "anonymous";
-      img.onload = () => resolve(img);
+      img.onload = async () => {
+        if (img.decode) {
+          try { await img.decode(); } catch (_) {}
+        }
+        resolve(img);
+      };
       img.onerror = (e) => reject(new Error("Failed to load Data/Blob URL image"));
       img.src = rawUrl;
     });
@@ -46,7 +51,12 @@ export const loadCorsSafeImage = async (rawUrl) => {
     return new Promise((resolve, reject) => {
       const img = new Image();
       img.crossOrigin = "anonymous";
-      img.onload = () => resolve(img);
+      img.onload = async () => {
+        if (img.decode) {
+          try { await img.decode(); } catch (_) {}
+        }
+        resolve(img);
+      };
       img.onerror = (e) => reject(new Error("Failed to load converted Data URL image"));
       img.src = dataUrl;
     });
@@ -80,7 +90,12 @@ export const loadCorsSafeImage = async (rawUrl) => {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
-    img.onload = () => resolve(img);
+    img.onload = async () => {
+      if (img.decode) {
+        try { await img.decode(); } catch (_) {}
+      }
+      resolve(img);
+    };
     img.onerror = (e) => reject(new Error(`Failed to load image from URL: ${rawUrl}`));
     img.src = proxyUrl || targetUrl;
   });

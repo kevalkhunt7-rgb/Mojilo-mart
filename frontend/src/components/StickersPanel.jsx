@@ -99,6 +99,7 @@ export default function StickersPanel({ manualSync }) {
   const handleAddSticker = async (rawImgUrl) => {
     const canvas = activeCanvas || getActiveCanvas();
     if (!canvas || !rawImgUrl) return;
+    console.log(`🖼️ [StickersPanel] Adding sticker to Canvas ID = ${canvas.__canvas_id}, url = ${rawImgUrl}`);
 
     try {
       const imgElement = await loadCorsSafeImage(rawImgUrl);
