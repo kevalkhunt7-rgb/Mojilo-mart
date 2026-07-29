@@ -1,17 +1,23 @@
 import { STORAGE_KEYS } from "./canvasStorageManager";
 import * as fabric from "fabric";
 import { withGuidesHidden } from "../components/CanvasEditor";
+
 // canvasSyncManager.js
 export const canvasSyncManager = {
   getCanvasTexture: (fabricCanvas) => {
     if (!fabricCanvas) return null;
-    
-    // Check if canvas is fully initialized (has internal ctx, DOM elements, etc.)
-    if (!fabricCanvas.lowerCanvasEl || !fabricCanvas.contextTop || !fabricCanvas.getWidth() || !fabricCanvas.getHeight()) {
-      console.warn("getCanvasTexture: Canvas not fully initialized yet");
+
+    // Check if canvas is fully initialized (has internal elements & context)
+    // Note: Removed console.warn to prevent log spamming in render loops
+    if (
+      !fabricCanvas.lowerCanvasEl ||
+      !fabricCanvas.getContext() ||
+      !fabricCanvas.getWidth() ||
+      !fabricCanvas.getHeight()
+    ) {
       return null;
     }
-    
+
     try {
       // Force a render before getting the texture, hide guides first
       return withGuidesHidden(fabricCanvas, () => {
@@ -29,58 +35,73 @@ export const canvasSyncManager = {
   },
 
   getCanvasTextureFromStorage: (view) => {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
+      let tempCanvas = null;
       try {
         const storageKey =
           view === "front"
             ? STORAGE_KEYS.FRONT_CANVAS
             : STORAGE_KEYS.BACK_CANVAS;
 
-        const storedObjects = localStorage.getItem(storageKey);
-        if (!storedObjects) {
+        const storedData = localStorage.getItem(storageKey);
+        if (!storedData) {
           resolve(null);
           return;
         }
 
-        // Parse the stored JSON objects
-        const parsedObjects = JSON.parse(storedObjects);
+        // Parse the stored JSON
+        const parsed = JSON.parse(storedData);
 
-        // Create a temporary canvas
-        const tempCanvas = new fabric.Canvas(null, {
-          width: 450, // Set appropriate width
-          height: 500, // Set appropriate height
+        // Extract objects array whether stored as raw array OR as canvas.toJSON() ({ objects: [...] })
+        const objectsToEnliven = Array.isArray(parsed)
+          ? parsed
+          : parsed.objects || [];
+
+        if (objectsToEnliven.length === 0) {
+          resolve(null);
+          return;
+        }
+
+        // Create temporary headless canvas
+        tempCanvas = new fabric.Canvas(null, {
+          width: 450,
+          height: 500,
         });
 
-        // Use fabric.util.enlivenObjects to recreate canvas objects
-        fabric.util.enlivenObjects(parsedObjects)
-          .then((objects) => {
-            // Add recreated objects to the canvas
-            objects.forEach((obj) => {
-              tempCanvas.add(obj);
-            });
+        // Recreate Fabric objects
+        const objects = await fabric.util.enlivenObjects(objectsToEnliven);
 
-            // Generate texture
-            const dataURL = tempCanvas.toDataURL({
-              format: "png",
-              quality: 1,
-              multiplier: 1,
-              enableRetinaScaling: true,
-            });
+        // Add objects to the temporary canvas
+        objects.forEach((obj) => {
+          tempCanvas.add(obj);
+        });
 
-            resolve(dataURL);
-          })
-          .catch((error) => {
-            console.error("Error enlivening objects:", error);
-            resolve(null);
-          });
+        // Render all objects before exporting
+        tempCanvas.renderAll();
+
+        // Generate texture
+        const dataURL = tempCanvas.toDataURL({
+          format: "png",
+          quality: 1,
+          multiplier: 1,
+          enableRetinaScaling: true,
+        });
+
+        // Clean up temporary canvas memory
+        tempCanvas.dispose();
+
+        resolve(dataURL);
       } catch (error) {
         console.error("Error retrieving canvas texture from storage:", error);
-        reject(error);
+        if (tempCanvas && typeof tempCanvas.dispose === "function") {
+          tempCanvas.dispose();
+        }
+        resolve(null);
       }
     });
   },
 
-  // utility function
+  // Utility function
   debounce: (func, wait) => {
     let timeout;
     return function executedFunction(...args) {
