@@ -1,16 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, User, Star, ShoppingBag, Menu, X, ArrowRight, LogOut } from 'lucide-react';
+import { Search, User, Star, ShoppingBag, Menu, X, ArrowRight, LogOut, Loader2 } from 'lucide-react';
 import logo from '../assets/Logo.png';
 import { Link, useNavigate } from 'react-router-dom';
 import { useWishlist } from '../context/WishlistContext';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import api from '../lib/axios';
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen]     = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [activeTab, setActiveTab]       = useState('Home');
   const [searchQuery, setSearchQuery]   = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching]   = useState(false);
   const [scrolled, setScrolled]         = useState(false);
   const searchInputRef                  = useRef(null);
   const navigate                        = useNavigate();
@@ -85,8 +88,40 @@ export default function Navbar() {
     setActiveTab(match ? match.name : path === '/' ? 'Home' : '');
   }, [window.location.search, window.location.pathname]);
 
+  // ── Debounced Atlas Search ──────────────────────────────────
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await api.get('/products', {
+          params: { search: searchQuery.trim(), limit: 6 }
+        });
+        let items = [];
+        if (Array.isArray(res.data)) items = res.data;
+        else if (Array.isArray(res.data?.data)) items = res.data.data;
+        else if (Array.isArray(res.data?.products)) items = res.data.products;
+        else if (Array.isArray(res.data?.data?.products)) items = res.data.data.products;
+
+        setSearchResults(items);
+      } catch (err) {
+        console.error('Debounced Atlas search error:', err);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   const handleSearchSubmit = (e) => {
-    e.preventDefault();
+    e?.preventDefault();
     if (!searchQuery.trim()) return;
     setIsSearchOpen(false);
     navigate(`/collection?search=${encodeURIComponent(searchQuery.trim())}`);
@@ -254,38 +289,98 @@ export default function Navbar() {
             </button>
           </form>
 
-          {/* Categories */}
-          <div className="mb-4">
-            <p className="text-[10px] font-bold tracking-[0.16em] uppercase text-gray-400 mb-2.5">Shop by category</p>
-            <div className="grid grid-cols-3 gap-2">
-              {categories.map((cat) => (
-                <button
-                  key={cat.name}
-                  onClick={() => handleCategoryClick(cat.href)}
-                  className="flex items-center justify-between px-3.5 py-2.5 bg-gray-50 hover:bg-amber-50 rounded-xl text-[13px] font-semibold text-gray-800 hover:text-[#A47A46] border border-gray-100 transition-all cursor-pointer group"
-                >
-                  {cat.name}
-                  <ArrowRight size={14} className="text-gray-300 group-hover:text-[#A47A46] transition-colors" />
-                </button>
-              ))}
-            </div>
-          </div>
+          {/* Live Atlas Search Results Preview or Category Suggestions */}
+          {searchQuery.trim() ? (
+            <div className="mb-4 max-h-72 overflow-y-auto">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[10px] font-bold tracking-[0.16em] uppercase text-gray-400">
+                  Search Results
+                </p>
+                {isSearching && (
+                  <span className="flex items-center gap-1 text-[11px] text-[#A47A46] font-medium">
+                    <Loader2 size={12} className="animate-spin" /> Searching...
+                  </span>
+                )}
+              </div>
 
-          {/* Sub-categories */}
-          <div>
-            <p className="text-[10px] font-bold tracking-[0.16em] uppercase text-gray-400 mb-2.5">Shop by subcategory</p>
-            <div className="flex flex-wrap gap-1.5">
-              {subCategories.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => handleSubCategoryClick(s)}
-                  className="text-[12px] font-semibold bg-gray-50 hover:bg-amber-50 text-gray-700 hover:text-[#A47A46] px-3 py-1.5 rounded-lg border border-gray-100 transition-colors cursor-pointer"
-                >
-                  {s}
-                </button>
-              ))}
+              {searchResults.length > 0 ? (
+                <div className="space-y-1.5">
+                  {searchResults.map((product) => {
+                    const price = (product.salePrice && Number(product.salePrice) > 0) ? product.salePrice : (product.price || product.basePrice || 0);
+                    const img = product.images?.[0]?.url || product.image || product.imageUrl;
+
+                    return (
+                      <div
+                        key={product._id || product.id}
+                        onClick={() => {
+                          setIsSearchOpen(false);
+                          navigate(`/product/${product.slug || product._id || product.id}`);
+                          setSearchQuery('');
+                        }}
+                        className="flex items-center gap-3 p-2 hover:bg-amber-50/60 rounded-xl cursor-pointer transition-colors border border-transparent hover:border-amber-200/50"
+                      >
+                        {img ? (
+                          <img src={img} alt={product.name} className="w-10 h-10 object-contain rounded-lg bg-gray-50 border border-gray-100 shrink-0" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-xs text-gray-400 shrink-0">
+                            👕
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-xs font-semibold text-gray-900 truncate">{product.name || product.title}</h4>
+                          <p className="text-[10px] text-gray-400 truncate">{product.category?.name || product.clothingType || 'Apparel'}</p>
+                        </div>
+                        <span className="text-xs font-bold text-[#A47A46]">₹{price}</span>
+                      </div>
+                    );
+                  })}
+                  <button
+                    onClick={handleSearchSubmit}
+                    className="w-full text-center py-2 text-xs font-bold text-[#A47A46] hover:underline cursor-pointer"
+                  >
+                    See all results for "{searchQuery.trim()}" →
+                  </button>
+                </div>
+              ) : !isSearching ? (
+                <p className="text-xs text-gray-400 py-4 text-center">No products found matching "{searchQuery}".</p>
+              ) : null}
             </div>
-          </div>
+          ) : (
+            <>
+              {/* Categories */}
+              <div className="mb-4">
+                <p className="text-[10px] font-bold tracking-[0.16em] uppercase text-gray-400 mb-2.5">Shop by category</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {categories.map((cat) => (
+                    <button
+                      key={cat.name}
+                      onClick={() => handleCategoryClick(cat.href)}
+                      className="flex items-center justify-between px-3.5 py-2.5 bg-gray-50 hover:bg-amber-50 rounded-xl text-[13px] font-semibold text-gray-800 hover:text-[#A47A46] border border-gray-100 transition-all cursor-pointer group"
+                    >
+                      {cat.name}
+                      <ArrowRight size={14} className="text-gray-300 group-hover:text-[#A47A46] transition-colors" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Sub-categories */}
+              <div>
+                <p className="text-[10px] font-bold tracking-[0.16em] uppercase text-gray-400 mb-2.5">Shop by subcategory</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {subCategories.map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => handleSubCategoryClick(s)}
+                      className="text-[12px] font-semibold bg-gray-50 hover:bg-amber-50 text-gray-700 hover:text-[#A47A46] px-3 py-1.5 rounded-lg border border-gray-100 transition-colors cursor-pointer"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 

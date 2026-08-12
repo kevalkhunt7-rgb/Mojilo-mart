@@ -25,6 +25,7 @@ const categorySchema = new mongoose.Schema(
 );
 
 categorySchema.index({ slug: 1 });
+categorySchema.index({ createdAt: -1 });
 
 categorySchema.pre('save', function (next) {
   if (this.isModified('name')) {

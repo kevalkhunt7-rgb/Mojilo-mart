@@ -26,12 +26,24 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
 });
 
 export const getAllOrders = asyncHandler(async (req, res) => {
-  const orders = await Order.find({})
-    .populate('user', 'name email')
-    .sort({ createdAt: -1 })
-    .limit(1000)
-    .lean();
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+  const skip = (page - 1) * limit;
 
-  const populatedOrders = await orderRepository.populateOrdersHelper(orders);
-  res.status(200).json(new ApiResponse(200, populatedOrders, 'Orders retrieved successfully'));
+  const { orders, total } = await orderRepository.getOrdersList({ skip, limit });
+
+  res.status(200).json(new ApiResponse(200, {
+    orders,
+    pagination: {
+      page,
+      limit,
+      totalItems: total,
+      totalPages: Math.ceil(total / limit)
+    }
+  }, 'Orders retrieved successfully'));
+});
+
+export const cancelUnpaidOrder = asyncHandler(async (req, res) => {
+  const result = await orderService.cancelUnpaidOrder(req.params.id, req.user._id);
+  res.status(200).json(new ApiResponse(200, result, 'Unpaid order cancelled'));
 });

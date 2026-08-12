@@ -15,6 +15,13 @@ class CouponRepository extends BaseRepository {
       $inc: { usageCount: 1 }
     }, { new: true });
   }
+
+  async decrementUsage(couponId) {
+    if (!couponId) return null;
+    return await Coupon.findByIdAndUpdate(couponId, {
+      $inc: { usageCount: -1 }
+    }, { new: true });
+  }
 }
 
 export default new CouponRepository();

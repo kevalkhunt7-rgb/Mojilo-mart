@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../lib/axios';
 
 const AuthContext = createContext();
 
@@ -16,33 +16,66 @@ export const AuthProvider = ({ children }) => {
 
     checkAuthPromise = (async () => {
       try {
-        // 1. Try to refresh access token
-        const refreshRes = await axios.post('/api/auth/refresh', {}, { withCredentials: true });
-        const token = refreshRes.data?.data?.accessToken;
+        const storedToken = localStorage.getItem('admin_accessToken') || localStorage.getItem('accessToken');
+        if (!storedToken) {
+          setUser(null);
+          setLoading(false);
+          return;
+        }
 
-        if (token) {
-          axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-          // 2. Fetch user profile
-          const profileRes = await axios.get('/api/users/profile');
+        api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+
+        try {
+          // 1. Try fetching profile directly with valid stored token
+          const profileRes = await api.get('/users/profile');
           const profileUser = profileRes.data?.data;
 
           if (profileUser && profileUser.role !== 'admin') {
             try {
-              await axios.post('/api/auth/logout', {}, { withCredentials: true });
+              await api.post('/auth/logout');
             } catch (logoutErr) {
               console.error('Failed to logout non-admin user during checkAuth', logoutErr);
             }
             setUser(null);
-            delete axios.defaults.headers.common['Authorization'];
+            localStorage.removeItem('admin_accessToken');
+            delete api.defaults.headers.common['Authorization'];
           } else {
             setUser(profileUser || null);
           }
-        } else {
-          setUser(null);
+          return;
+        } catch (profileErr) {
+          // 2. If stored token expired (401), attempt session refresh
+          if (profileErr.response?.status === 401) {
+            const refreshRes = await api.post('/auth/refresh');
+            const token = refreshRes.data?.data?.accessToken;
+
+            if (token) {
+              localStorage.setItem('admin_accessToken', token);
+              api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+              const profileRes = await api.get('/users/profile');
+              const profileUser = profileRes.data?.data;
+
+              if (profileUser && profileUser.role !== 'admin') {
+                try {
+                  await api.post('/auth/logout');
+                } catch (logoutErr) {
+                  console.error('Failed to logout non-admin user', logoutErr);
+                }
+                setUser(null);
+                localStorage.removeItem('admin_accessToken');
+                delete api.defaults.headers.common['Authorization'];
+              } else {
+                setUser(profileUser || null);
+              }
+              return;
+            }
+          }
+          throw profileErr;
         }
       } catch (err) {
         setUser(null);
-        delete axios.defaults.headers.common['Authorization'];
+        localStorage.removeItem('admin_accessToken');
+        delete api.defaults.headers.common['Authorization'];
       } finally {
         setLoading(false);
         checkAuthPromise = null;
@@ -58,20 +91,21 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      const res = await axios.post('/api/auth/login', { email, password }, { withCredentials: true });
+      const res = await api.post('/auth/login', { email, password });
       const token = res.data?.data?.accessToken;
       const loggedInUser = res.data?.data?.user;
 
       if (token) {
         if (loggedInUser && loggedInUser.role !== 'admin') {
           try {
-            await axios.post('/api/auth/logout', {}, { withCredentials: true });
+            await api.post('/auth/logout');
           } catch (logoutErr) {
             console.error('Failed to logout non-admin user', logoutErr);
           }
           return { success: false, message: 'Access denied: Admin role required' };
         }
-        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        localStorage.setItem('admin_accessToken', token);
+        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         setUser(loggedInUser);
         return { success: true };
       }
@@ -83,9 +117,10 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      await axios.post('/api/auth/logout', {}, { withCredentials: true });
+      await api.post('/auth/logout');
       setUser(null);
-      delete axios.defaults.headers.common['Authorization'];
+      localStorage.removeItem('admin_accessToken');
+      delete api.defaults.headers.common['Authorization'];
     } catch (err) {
       console.error('Logout failed', err);
     }
@@ -99,3 +134,4 @@ export const AuthProvider = ({ children }) => {
 };
 
 export const useAuth = () => useContext(AuthContext);
+

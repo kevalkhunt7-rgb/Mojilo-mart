@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../lib/axios';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { ArrowLeft, ShoppingBag, Layers, Plus, Trash2 } from 'lucide-react';
@@ -34,8 +34,8 @@ export default function EditVariant() {
     setLoading(true);
     try {
       const [variantRes, prodRes] = await Promise.all([
-        axios.get(`/api/variants/id/${id}`, { withCredentials: true }),
-        axios.get('/api/products?status=all&limit=1000', { withCredentials: true }),
+        api.get(`/variants/id/${id}`),
+        api.get('/products?status=all&limit=1000'),
       ]);
 
       const variant = variantRes.data?.data;
@@ -138,7 +138,7 @@ export default function EditVariant() {
     };
 
     try {
-      await axios.patch(`/api/variants/${id}`, payload, { withCredentials: true });
+      await api.patch(`/variants/${id}`, payload);
       toast.success('Product variant states updated successfully!');
       setTimeout(() => navigate('/variants'), 1500);
     } catch (err) {

@@ -1,11 +1,13 @@
 import mongoSanitize from 'express-mongo-sanitize';
 
+const mongoSanitizer = mongoSanitize();
+
 /**
  * Sanitizes input to prevent NoSQL query injection
  */
 export const sanitizeData = (req, res, next) => {
   // Express mongo sanitize middleware
-  mongoSanitize()(req, res, () => {
+  mongoSanitizer(req, res, () => {
     // Custom clean utility for sanitizing text input from basic HTML tags (anti-XSS)
     const cleanObject = (obj) => {
       if (!obj || typeof obj !== 'object') return obj;

@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -5,9 +6,7 @@ import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import morgan from 'morgan';
 import path from 'path';
-
-import dotenv from 'dotenv';
-dotenv.config();
+import mongoose from 'mongoose';
 
 // 2. IMPORT YOUR CLOUDINARY CONFIGURATION HOOK
 import { configureCloudinary } from './config/cloudinary.js'; // Adjust path if your file location is different
@@ -37,6 +36,7 @@ import dashboardRoutes from './routes/dashboardRoutes.js';
 import settingRoutes from './routes/settingRoutes.js';
 import inventoryRoutes from './routes/inventoryRoutes.js';
 import bannerRoutes from './routes/bannerRoutes.js';
+import cancellationRoutes from './routes/cancellationRoutes.js';
 import apparelTemplateRoutes, { publicApparelRouter as apparelPublicRoutes } from './routes/apparelTemplateRoutes.js';
 import imageGenerationRoutes from './routes/imageGenerationRoutes.js';
 
@@ -102,8 +102,41 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cookieParser());
 app.use(sanitizeData);
 
+app.use((req, res, next) => {
+  const start = Date.now();
+  const authHeader = req.headers.authorization ? 'Bearer ***' : 'NONE';
+  const cookieAuth = req.cookies?.accessToken ? 'Cookie ***' : 'NONE';
+  console.log(`[BACKEND REQ] ${req.method} ${req.originalUrl} | AuthHeader: ${authHeader} | Cookie: ${cookieAuth}`);
+  
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    console.log(`[BACKEND RES] ${req.method} ${req.originalUrl} | Status: ${res.statusCode} | Time: ${duration}ms`);
+  });
+  next();
+});
 // API Limiters
 app.use('/api', apiLimiter);
+app.use('/api', async (req, res, next) => {
+  if (mongoose.connection.readyState !== 1) {
+    // If state is connecting (2), give it a brief grace period (up to 2000ms) to finish connecting
+    if (mongoose.connection.readyState === 2) {
+      let attempts = 0;
+      while (attempts < 20 && mongoose.connection.readyState === 2) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        attempts++;
+      }
+    }
+
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({
+        success: false,
+        message: 'Database connection is not ready. Please try again in a moment.',
+        errors: []
+      });
+    }
+  }
+  next();
+});
 
 // Route Bindings
 app.use('/api/auth', authRoutes);
@@ -123,6 +156,7 @@ app.use('/api/custom-cart', customCartRoutes);
 app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/coupons', couponRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/cancellations', cancellationRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/refunds', refundRoutes);
 app.use('/api/shipping', shippingRoutes);

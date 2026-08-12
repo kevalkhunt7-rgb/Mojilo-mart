@@ -6,6 +6,7 @@ import ApiError from '../utils/ApiError.js';
 import generateOTP from '../utils/generateOTP.js';
 import { generateAccessToken, generateRefreshToken } from '../utils/generateToken.js';
 import sendEmail from '../utils/sendEmail.js';
+import { OAuth2Client } from 'google-auth-library';
 
 class AuthService {
   async registerUser({ name, email, password, phoneNumber }) {
@@ -91,11 +92,7 @@ class AuthService {
 
     // Save refresh token
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
-    await RefreshToken.create({
-      user: user._id,
-      token: refreshToken,
-      expiresAt,
-    });
+    await this.saveRefreshToken(user._id, refreshToken, expiresAt);
 
     return {
       user: {
@@ -108,6 +105,26 @@ class AuthService {
       accessToken,
       refreshToken
     };
+  }
+
+  async saveRefreshToken(userId, token, expiresAt) {
+    try {
+      await RefreshToken.create({
+        user: userId,
+        token: token,
+        expiresAt,
+      });
+    } catch (err) {
+      if (err.code === 11000) {
+        await RefreshToken.findOneAndUpdate(
+          { token },
+          { user: userId, expiresAt, isRevoked: false },
+          { upsert: true }
+        );
+      } else {
+        throw err;
+      }
+    }
   }
 
   async refreshUserSession(token) {
@@ -134,11 +151,7 @@ class AuthService {
     await tokenDoc.save();
 
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
-    await RefreshToken.create({
-      user: user._id,
-      token: newRefreshToken,
-      expiresAt,
-    });
+    await this.saveRefreshToken(user._id, newRefreshToken, expiresAt);
 
     return {
       accessToken: newAccessToken,
@@ -248,6 +261,75 @@ class AuthService {
 
     return { message: 'Password has been updated successfully.' };
   }
+
+  async googleAuth({ idToken }) {
+    if (!idToken) {
+      throw new ApiError(400, 'Google ID token is required');
+    }
+
+    let payload;
+    try {
+      const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+      const ticket = await client.verifyIdToken({
+        idToken,
+        audience: process.env.GOOGLE_CLIENT_ID || undefined,
+      });
+      payload = ticket.getPayload();
+    } catch (err) {
+      try {
+        const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`);
+        if (!response.ok) throw new Error('Failed to verify token with Google');
+        payload = await response.json();
+      } catch (fallbackErr) {
+        throw new ApiError(401, 'Invalid or expired Google authentication token');
+      }
+    }
+
+    if (!payload || !payload.email) {
+      throw new ApiError(400, 'Could not retrieve email from Google profile');
+    }
+
+    const { email, name, picture } = payload;
+
+    let user = await userRepository.findByEmail(email);
+
+    if (!user) {
+      const randomPassword = Math.random().toString(36).slice(-10) + Math.random().toString(36).slice(-10);
+      user = await userRepository.create({
+        name: name || email.split('@')[0],
+        email: email,
+        password: randomPassword,
+        isEmailVerified: true,
+        status: 'active',
+      });
+    } else {
+      if (!user.isEmailVerified) {
+        user.isEmailVerified = true;
+        user.status = 'active';
+        await user.save();
+      }
+    }
+
+    const accessToken = generateAccessToken(user._id);
+    const refreshToken = generateRefreshToken(user._id);
+
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    await this.saveRefreshToken(user._id, refreshToken, expiresAt);
+
+    return {
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        permissions: user.permissions,
+        picture: picture || null
+      },
+      accessToken,
+      refreshToken
+    };
+  }
 }
 
 export default new AuthService();
+

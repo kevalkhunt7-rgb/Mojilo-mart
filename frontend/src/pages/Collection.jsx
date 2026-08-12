@@ -36,8 +36,13 @@ const Collection = () => {
     const fetchCatalogData = async () => {
       setLoading(true);
       try {
+        const params = {};
+        if (textSearchFromUrl) params.search = textSearchFromUrl;
+        if (genderFromUrl) params.gender = genderFromUrl;
+        if (categoryFromUrl) params.category = categoryFromUrl;
+
         const [prodRes, catRes] = await Promise.all([
-          api.get('/products'),
+          api.get('/products', { params }),
           api.get('/categories').catch(() => ({ data: [] }))
         ]);
         
@@ -75,7 +80,7 @@ const Collection = () => {
     };
 
     fetchCatalogData();
-  }, []);
+  }, [textSearchFromUrl, genderFromUrl, categoryFromUrl]);
 
   // Prevent background scroll when mobile filter overlay is active
   useEffect(() => {

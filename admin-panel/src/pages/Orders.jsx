@@ -1,19 +1,22 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
-import { 
-  Search, 
-  Calendar, 
-  SlidersHorizontal, 
-  Download, 
-  Eye, 
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import api from '../lib/axios';
+import {
+  Search,
+  Download,
+  Eye,
   RefreshCw,
   Clock,
   MoreVertical,
   CheckCircle,
   Truck,
   Printer,
-  AlertTriangle,
-  RotateCcw
+  RotateCcw,
+  PackageCheck,
+  ShieldCheck,
+  XCircle,
+  X,
+  ChevronRight
 } from 'lucide-react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -28,21 +31,30 @@ const getFullImageUrl = (url) => {
   return url.startsWith('/') ? `${cleanBackendUrl}${url}` : `${cleanBackendUrl}/${url}`;
 };
 
+// Canonical fulfillment pipeline — drives both the status menu and the modal's progress rail.
+const FULFILLMENT_STEPS = ['pending','confirmed', 'printing', 'packed', 'shipped', 'delivered' ,'cancelled'];
+const TERMINAL_STEPS = ['refunded', 'cancelled'];
+
 export default function Orders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [activeMenuId, setActiveMenuId] = useState(null);
+  const [menuAnchorEl, setMenuAnchorEl] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [previewModes, setPreviewModes] = useState({});
 
   const getLayerDetails = (customization) => {
     if (!customization) return [];
-    
+
     // 1. Check if customization has populated layers from database Layer model
     if (Array.isArray(customization.layers) && customization.layers.length > 0) {
       return customization.layers.map((l, idx) => {
         const rawSrc = l.imageConfig?.src || l.imageConfig?.originalUrl || l.imageConfig?.processedUrl || l.src || l.url || l.originalSrc || null;
+        const wPx = Math.abs((Number(l.width) || 0) * (l.scaleX !== undefined ? Number(l.scaleX) : 1));
+        const hPx = Math.abs((Number(l.height) || 0) * (l.scaleY !== undefined ? Number(l.scaleY) : 1));
+
         return {
           id: l.layerId || l._id || idx,
           view: (l.printAreaName || 'Front').charAt(0).toUpperCase() + (l.printAreaName || 'Front').slice(1),
@@ -54,8 +66,8 @@ export default function Orders() {
           fontSize: l.textConfig?.fontSize || null,
           color: l.textConfig?.fillColor || null,
           src: getFullImageUrl(rawSrc),
-          widthInches: ((l.width || 100) / 50).toFixed(1),
-          heightInches: ((l.height || 100) / 50).toFixed(1)
+          widthInches: (wPx / 50).toFixed(1),
+          heightInches: (hPx / 50).toFixed(1)
         };
       });
     }
@@ -80,7 +92,7 @@ export default function Orders() {
           const wInches = (w / 50).toFixed(1);
           const hInches = (h / 50).toFixed(1);
           const rawSrc = obj.src || obj.originalSrc || obj.url || null;
-          
+
           layers.push({
             id: obj.id || `${view}-${idx}`,
             view: view.charAt(0).toUpperCase() + view.slice(1),
@@ -123,14 +135,14 @@ export default function Orders() {
         });
       });
     }
-    
+
     return layers;
   };
 
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const res = await axios.get('/api/orders', { withCredentials: true });
+      const res = await api.get('/orders?limit=50');
       const raw = res.data?.data;
       const items = Array.isArray(raw) ? raw : (Array.isArray(raw?.orders) ? raw.orders : []);
       setOrders(items);
@@ -142,13 +154,30 @@ export default function Orders() {
     }
   };
 
+  const handleInspectOrder = async (order) => {
+    if (!order?._id) return;
+    setSelectedOrder(order);
+    try {
+      const res = await api.get(`/orders/${order._id}`);
+      if (res.data?.data) {
+        setSelectedOrder(res.data.data);
+      }
+    } catch (err) {
+      console.error('Failed to load full order details:', err);
+    }
+  };
+
+  const initialFetchRef = useRef(false);
+
   useEffect(() => {
+    if (initialFetchRef.current) return;
+    initialFetchRef.current = true;
     fetchOrders();
   }, []);
 
   const handleUpdateStatus = async (orderId, newStatus) => {
     try {
-      await axios.patch(`/api/orders/${orderId}/status`, { status: newStatus }, { withCredentials: true });
+      await api.patch(`/orders/${orderId}/status`, { status: newStatus });
       toast.success(`Order status updated to ${newStatus.toUpperCase()}`);
       setActiveMenuId(null);
       fetchOrders();
@@ -165,21 +194,36 @@ export default function Orders() {
   };
 
   const statusSummaries = [
-    { label: 'Delivered', count: getStatusCount('delivered') || getStatusCount('completed'), icon: CheckCircle, iconWrap: 'bg-emerald-50 text-emerald-600', dotBg: 'bg-emerald-500', labelColor: 'text-emerald-600' },
-    { label: 'Shipped', count: getStatusCount('shipped'), icon: Truck, iconWrap: 'bg-indigo-50 text-indigo-600', dotBg: 'bg-indigo-500', labelColor: 'text-indigo-600' },
-    { label: 'Printing', count: getStatusCount('printing'), icon: Printer, iconWrap: 'bg-amber-50 text-amber-600', dotBg: 'bg-amber-500', labelColor: 'text-amber-600' },
-    { label: 'Pending', count: getStatusCount('pending'), icon: Clock, iconWrap: 'bg-slate-100 text-slate-500', dotBg: 'bg-slate-400', labelColor: 'text-slate-500' },
-    { label: 'Refunded', count: getStatusCount('refunded'), icon: RotateCcw, iconWrap: 'bg-red-50 text-red-600', dotBg: 'bg-red-500', labelColor: 'text-red-600' },
+    { key: 'delivered', label: 'Delivered', count: getStatusCount('delivered') || getStatusCount('completed'), icon: CheckCircle, accent: 'emerald' },
+    { key: 'shipped', label: 'Shipped', count: getStatusCount('shipped'), icon: Truck, accent: 'indigo' },
+    { key: 'printing', label: 'Printing', count: getStatusCount('printing'), icon: Printer, accent: 'amber' },
+    { key: 'pending', label: 'Pending', count: getStatusCount('pending'), icon: Clock, accent: 'slate' },
+    { key: 'refunded', label: 'Refunded', count: getStatusCount('refunded'), icon: RotateCcw, accent: 'rose' },
   ];
 
-  // Filtering
-  const filteredOrders = safeOrders.filter((order) => {
-    if (!order) return false;
-    const query = searchQuery.toLowerCase();
-    const orderIdMatches = order._id?.toLowerCase().includes(query) || order.orderNumber?.toLowerCase().includes(query);
-    const customerMatches = order.user?.name?.toLowerCase().includes(query) || order.shippingAddress?.fullName?.toLowerCase().includes(query);
-    return orderIdMatches || customerMatches;
-  });
+  const accentClasses = {
+    emerald: { wrap: 'bg-emerald-50 text-emerald-600', dot: 'bg-emerald-500', text: 'text-emerald-600', ring: 'ring-emerald-500/30', activeBg: 'bg-emerald-600' },
+    indigo: { wrap: 'bg-indigo-50 text-indigo-600', dot: 'bg-indigo-500', text: 'text-indigo-600', ring: 'ring-indigo-500/30', activeBg: 'bg-indigo-600' },
+    amber: { wrap: 'bg-amber-50 text-amber-600', dot: 'bg-amber-500', text: 'text-amber-600', ring: 'ring-amber-500/30', activeBg: 'bg-amber-600' },
+    slate: { wrap: 'bg-slate-100 text-slate-500', dot: 'bg-slate-400', text: 'text-slate-500', ring: 'ring-slate-500/20', activeBg: 'bg-slate-600' },
+    rose: { wrap: 'bg-rose-50 text-rose-600', dot: 'bg-rose-500', text: 'text-rose-600', ring: 'ring-rose-500/30', activeBg: 'bg-rose-600' },
+  };
+
+  // Filtering — search text + status card selection combine
+  const filteredOrders = useMemo(() => {
+    return safeOrders.filter((order) => {
+      if (!order) return false;
+      const query = searchQuery.toLowerCase();
+      const orderIdMatches = order._id?.toLowerCase().includes(query) || order.orderNumber?.toLowerCase().includes(query);
+      const customerMatches = order.user?.name?.toLowerCase().includes(query) || order.shippingAddress?.fullName?.toLowerCase().includes(query);
+      const matchesSearch = query === '' || orderIdMatches || customerMatches;
+
+      if (statusFilter === 'all') return matchesSearch;
+      const status = order.orderStatus?.toLowerCase();
+      const matchesStatus = status === statusFilter || (statusFilter === 'delivered' && status === 'completed');
+      return matchesSearch && matchesStatus;
+    });
+  }, [safeOrders, searchQuery, statusFilter]);
 
   // Export CSV
   const handleExportCSV = () => {
@@ -194,7 +238,7 @@ export default function Orders() {
       o.paymentStatus,
       o.orderStatus
     ]);
-    const csvContent = "data:text/csv;charset=utf-8," 
+    const csvContent = "data:text/csv;charset=utf-8,"
       + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
@@ -255,8 +299,6 @@ export default function Orders() {
         return 'bg-red-50 text-red-700 border-red-200';
       case 'packed':
         return 'bg-blue-50 text-blue-700 border-blue-200';
-      case 'qc check':
-        return 'bg-purple-50 text-purple-700 border-purple-200';
       case 'cancelled':
         return 'bg-rose-50 text-rose-700 border-rose-200';
       default:
@@ -264,76 +306,266 @@ export default function Orders() {
     }
   };
 
-  // Shared dropdown menu used by both the desktop table row and the mobile card
-  const StatusMenu = ({ order }) => (
-    <div className="absolute right-0 mt-1 z-30 w-44 bg-white border border-slate-200 rounded-xl shadow-lg p-1.5 space-y-0.5 animate-in fade-in duration-100 text-left">
-      <p className="text-[9px] font-bold text-slate-400 uppercase px-2 py-1 tracking-wider border-b border-slate-100 mb-1">Set State</p>
-      {['pending', 'printing', 'packed', 'qc check', 'shipped', 'delivered', 'refunded', 'cancelled'].map((st) => (
-        <button
-          key={st}
-          onClick={() => handleUpdateStatus(order._id, st)}
-          className="w-full text-left px-2 py-1.5 rounded-lg text-[11px] font-semibold hover:bg-indigo-50 text-slate-600 hover:text-indigo-600 transition-colors uppercase"
+  const getItemImage = (item) => {
+    if (!item) return null;
+    const cust = item.customization;
+    if (cust && typeof cust === 'object') {
+      const custImg = cust.previewUrl || cust.decalUrl || cust.previews?.mockup || cust.previews?.front || cust.preview;
+      if (custImg) return getFullImageUrl(custImg);
+    }
+    const prod = item.product;
+    if (prod && typeof prod === 'object') {
+      const prodImg = prod.image || prod.images?.[0]?.url || (typeof prod.images?.[0] === 'string' ? prod.images?.[0] : null);
+      if (prodImg) return getFullImageUrl(prodImg);
+    }
+    const directImg = item.image || item.imageUrl;
+    if (directImg) return getFullImageUrl(directImg);
+    return null;
+  };
+
+  const getItemDisplayName = (item) => {
+    if (!item) return 'Product';
+    return item.productName || item.product?.name || 'Product';
+  };
+
+  const isItemCustomized = (item) => {
+    if (!item) return false;
+
+    // 1. Explicit boolean flag on item set by backend
+    if (item.isCustomized === true || item.isCustomized === 'true') return true;
+
+    // 2. Check customization object for actual custom layers / design JSON
+    const cust = typeof item.customization === 'object' && item.customization !== null ? item.customization : {};
+    const hasLayers = Array.isArray(cust.layers) && cust.layers.length > 0;
+    const hasEditableJSON = cust.editableDesignJSON && typeof cust.editableDesignJSON === 'object' && Object.keys(cust.editableDesignJSON).length > 0;
+    const hasCanvasJSON = cust.canvasJSON && typeof cust.canvasJSON === 'object' && Object.keys(cust.canvasJSON).length > 0;
+
+    if (hasLayers || hasEditableJSON || hasCanvasJSON || cust.isCustomDesign === true) {
+      return true;
+    }
+
+    // 3. Check if it's explicitly a custom template product
+    const prodName = item.productName || item.product?.name || item.name || '';
+    if (item.isCustomTemplate || prodName === 'Custom Template Item') {
+      return true;
+    }
+
+    // Otherwise, standard catalog product (not customized)
+    return false;
+  };
+
+  // Shared dropdown menu rendered via React Portal attached to document.body
+  const StatusMenu = ({ order, anchorEl, onClose, onUpdateStatus }) => {
+    const [coords, setCoords] = useState({ top: 0, left: 0 });
+    const menuRef = useRef(null);
+
+    useLayoutEffect(() => {
+      if (!anchorEl) return;
+
+      const updatePosition = () => {
+        const rect = anchorEl.getBoundingClientRect();
+        const menuEl = menuRef.current;
+        const dropdownWidth = menuEl ? menuEl.offsetWidth : 192;
+        const dropdownHeight = menuEl ? menuEl.offsetHeight : 280;
+
+        // Calculate vertical space
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const spaceAbove = rect.top;
+        const placement = spaceBelow < dropdownHeight && spaceAbove > spaceBelow ? 'top' : 'bottom';
+
+        let top = placement === 'top' ? rect.top - dropdownHeight - 6 : rect.bottom + 6;
+        if (top < 8) top = 8;
+        if (top + dropdownHeight > window.innerHeight - 8) {
+          top = Math.max(8, window.innerHeight - dropdownHeight - 8);
+        }
+
+        // Align right edge of dropdown with right edge of trigger button
+        let left = rect.right - dropdownWidth;
+        if (left + dropdownWidth > window.innerWidth - 8) {
+          left = window.innerWidth - dropdownWidth - 8;
+        }
+        if (left < 8) left = 8;
+
+        setCoords({ top, left });
+      };
+
+      updatePosition();
+
+      window.addEventListener('resize', updatePosition);
+      window.addEventListener('scroll', updatePosition, true);
+
+      return () => {
+        window.removeEventListener('resize', updatePosition);
+        window.removeEventListener('scroll', updatePosition, true);
+      };
+    }, [anchorEl]);
+
+    if (!anchorEl || !order) return null;
+
+    return createPortal(
+      <div className="fixed inset-0 z-[999999] pointer-events-auto">
+        {/* Invisible backdrop to dismiss dropdown when clicking outside */}
+        <div
+          className="fixed inset-0 bg-transparent"
+          onClick={onClose}
+        />
+        <div
+          ref={menuRef}
+          style={{
+            position: 'fixed',
+            top: `${coords.top}px`,
+            left: `${coords.left}px`,
+          }}
+          className="z-[1000000] w-48 bg-white dark:bg-[#181B2A] border border-slate-200 dark:border-[#272B40] rounded-xl shadow-xl shadow-slate-900/10 p-1.5 space-y-0.5 animate-in fade-in zoom-in-95 duration-100 text-left"
         >
-          {st}
-        </button>
-      ))}
-    </div>
-  );
+          <p className="text-[9px] font-bold text-slate-400 dark:text-slate-400 uppercase px-2.5 py-1.5 tracking-wider border-b border-slate-100 dark:border-[#272B40] mb-1">
+            Move to stage
+          </p>
+          {['pending', 'confirmed', 'printing', 'packed', 'shipped', 'delivered', 'cancelled'].map((st) => {
+            const currentStatus = order.orderStatus?.toLowerCase() || 'pending';
+            const isCurrent = currentStatus === st || 
+              (st === 'pending' && (currentStatus === 'approved' || currentStatus === 'artwork_review'));
+            return (
+              <button
+                key={st}
+                onClick={() => {
+                  onUpdateStatus(order._id, st);
+                  onClose();
+                }}
+                className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-colors uppercase cursor-pointer ${
+                  isCurrent
+                    ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-300'
+                    : 'hover:bg-slate-50 dark:hover:bg-[#212538] text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-300'
+                }`}
+              >
+                {st}
+                {isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />}
+              </button>
+            );
+          })}
+        </div>
+      </div>,
+      document.body
+    );
+  };
+
+  // Fulfillment progress rail shown in the inspector modal
+  const FulfillmentRail = ({ status }) => {
+    const normalized = status?.toLowerCase() || 'pending';
+    const isTerminal = TERMINAL_STEPS.includes(normalized);
+    const currentIdx = FULFILLMENT_STEPS.indexOf(normalized);
+
+    if (isTerminal) {
+      return (
+        <div className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border ${
+          normalized === 'cancelled' ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-red-50 border-red-200 text-red-700'
+        }`}>
+          <XCircle size={16} className="shrink-0" />
+          <span className="text-xs font-bold uppercase tracking-wide">Order {normalized}</span>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex items-center w-full overflow-x-auto pb-1">
+        {FULFILLMENT_STEPS.map((step, idx) => {
+          const reached = currentIdx >= idx;
+          const isCurrent = currentIdx === idx;
+          return (
+            <React.Fragment key={step}>
+              <div className="flex flex-col items-center gap-1.5 shrink-0">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border-2 transition-colors ${
+                  reached
+                    ? 'bg-indigo-600 border-indigo-600 text-white'
+                    : 'bg-white border-slate-200 text-slate-300'
+                } ${isCurrent ? 'ring-4 ring-indigo-100' : ''}`}>
+                  {reached && !isCurrent ? <CheckCircle size={12} /> : idx + 1}
+                </div>
+                <span className={`text-[9px] font-bold uppercase tracking-wide whitespace-nowrap ${
+                  reached ? 'text-indigo-600' : 'text-slate-300'
+                }`}>
+                  {step}
+                </span>
+              </div>
+              {idx < FULFILLMENT_STEPS.length - 1 && (
+                <div className={`h-0.5 flex-1 min-w-[16px] mx-1 mb-4 rounded-full transition-colors ${
+                  currentIdx > idx ? 'bg-indigo-600' : 'bg-slate-200'
+                }`} />
+              )}
+            </React.Fragment>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-5 sm:space-y-6 max-w-[1600px] mx-auto pb-12 px-3 sm:px-0">
       <ToastContainer />
-      
+
       {/* --- TOP BAR TITLE & ACTIONS --- */}
-      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-[#0f172a] tracking-tight">Checkout Orders</h1>
-          <p className="text-sm text-slate-400 mt-0.5">{orders.length} total orders recorded</p>
+      <div className="relative overflow-hidden flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-gradient-to-br from-[#312e81] via-[#3730a3] to-[#4338ca] p-5 sm:p-7 rounded-2xl shadow-lg shadow-indigo-900/20">
+        <div className="absolute -right-10 -top-16 w-56 h-56 rounded-full bg-white/5" />
+        <div className="absolute right-24 -bottom-20 w-40 h-40 rounded-full bg-white/5" />
+        <div className="relative">
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-200 mb-1">Fulfillment Console</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">Checkout Orders</h1>
+          <p className="text-sm text-indigo-200/80 mt-1">
+            <span className="font-semibold text-white">{orders.length}</span> total orders recorded
+          </p>
         </div>
-        <div className="flex gap-2 shrink-0">
-          <button 
+        <div className="relative flex gap-2 shrink-0">
+          <button
             onClick={fetchOrders}
-            className="p-2 border border-slate-200 hover:bg-slate-50 rounded-xl transition-all text-slate-500"
+            className="p-2.5 bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl transition-all text-white backdrop-blur-sm"
             title="Refresh Data"
           >
             <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
           </button>
-          <button 
+          <button
             onClick={handleExportCSV}
-            className="flex items-center gap-1.5 bg-white px-3 sm:px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold shadow-sm hover:bg-slate-50 text-slate-700 transition-colors flex-1 sm:flex-none justify-center"
+            className="flex items-center gap-1.5 bg-white px-3 sm:px-4 py-2.5 rounded-xl text-xs font-bold shadow-sm hover:bg-indigo-50 text-indigo-700 transition-colors flex-1 sm:flex-none justify-center"
           >
-            <Download size={14} className="text-slate-500" /> Export CSV
+            <Download size={14} /> Export CSV
           </button>
         </div>
       </div>
 
-      {/* --- HORIZONTAL STATUS SUMMARY CARD BARS --- */}
+      {/* --- STATUS SUMMARY / FILTER CARDS --- */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4">
-        {statusSummaries.map((summary, idx) => {
+        {statusSummaries.map((summary) => {
           const Icon = summary.icon;
+          const a = accentClasses[summary.accent];
+          const isActive = statusFilter === summary.key;
           return (
-            <div key={idx} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex items-center gap-3">
-              <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${summary.iconWrap}`}>
+            <button
+              key={summary.key}
+              onClick={() => setStatusFilter(isActive ? 'all' : summary.key)}
+              className={`text-left bg-white dark:bg-[#181B2A] p-4 rounded-xl border shadow-sm flex items-center gap-3 transition-all hover:-translate-y-0.5 hover:shadow-md ${
+                isActive ? `border-transparent ring-2 ${a.ring}` : 'border-slate-100 dark:border-[#272B40]'
+              }`}
+            >
+              <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${a.wrap}`}>
                 <Icon size={16} strokeWidth={2.25} />
               </div>
               <div className="min-w-0">
-                <h3 className="text-lg sm:text-xl font-bold text-[#0f172a] leading-none font-mono">{summary.count}</h3>
+                <h3 className="text-lg sm:text-xl font-bold text-[#0f172a] dark:text-white leading-none font-mono tabular-nums">{summary.count}</h3>
                 <div className="inline-flex items-center gap-1.5 text-[11px] font-medium mt-1">
-                  <span className={`w-1.5 h-1.5 rounded-full ${summary.dotBg}`} />
-                  <span className={summary.labelColor}>{summary.label}</span>
+                  <span className={`w-1.5 h-1.5 rounded-full ${a.dot}`} />
+                  <span className={a.text}>{summary.label}</span>
                 </div>
               </div>
-            </div>
+            </button>
           );
         })}
       </div>
 
       {/* --- MAIN DATA CONTAINER PANEL --- */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-        
+      <div className="bg-white dark:bg-[#181B2A] rounded-2xl border border-slate-200/80 dark:border-[#272B40] shadow-sm overflow-hidden">
+
         {/* --- TOOLBAR FILTERS --- */}
-        <div className="p-4 flex flex-col sm:flex-row justify-between gap-3 border-b border-slate-100">
-          <div className="relative flex-1 max-w-md">
+        <div className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-100 dark:border-[#272B40]">
+          <div className="relative flex-1 max-w-md w-full">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
               <Search size={15} />
             </span>
@@ -342,192 +574,313 @@ export default function Orders() {
               placeholder="Search by order ID, number or customer name..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-[#f8fafc] border border-[#e2e8f0] rounded-xl text-xs outline-none transition-all duration-150 focus:border-[#4f46e5] focus:bg-white focus:ring-2 focus:ring-[#4f46e5]/10 text-[#0f172a] placeholder-[#94a3b8]"
+              className="w-full pl-9 pr-4 py-2.5 bg-[#f8fafc] dark:bg-[#0F172A] border border-[#e2e8f0] dark:border-[#272B40] rounded-xl text-xs outline-none transition-all duration-150 focus:border-[#4f46e5] focus:bg-white dark:focus:bg-[#1E2235] focus:ring-2 focus:ring-[#4f46e5]/10 text-[#0f172a] dark:text-white placeholder-[#94a3b8]"
             />
           </div>
+          {statusFilter !== 'all' && (
+            <button
+              onClick={() => setStatusFilter('all')}
+              className="flex items-center gap-1.5 text-[11px] font-bold text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 px-3 py-2 rounded-xl transition-colors shrink-0"
+            >
+              Filtering: {statusFilter.toUpperCase()}
+              <X size={12} />
+            </button>
+          )}
         </div>
 
         {/* --- LOADING / EMPTY STATES --- */}
         {loading ? (
-          <div className="p-12 text-center text-slate-500">
+          <div className="p-16 text-center text-slate-500 dark:text-slate-400">
             <div className="animate-spin inline-block w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full mb-3" />
-            <p className="text-sm text-slate-500">Loading orders...</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Loading orders...</p>
           </div>
         ) : filteredOrders.length === 0 ? (
-          <div className="p-12 text-center text-slate-400">
-            <Search size={22} className="mx-auto mb-2 text-slate-300" />
-            <p className="text-sm italic">No checkout records match filters</p>
+          <div className="p-16 text-center text-slate-400">
+            <div className="w-12 h-12 rounded-full bg-slate-50 dark:bg-[#0F172A] flex items-center justify-center mx-auto mb-3">
+              <Search size={20} className="text-slate-300 dark:text-slate-600" />
+            </div>
+            <p className="text-sm font-medium text-slate-500 dark:text-slate-400">No checkout records match your filters</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Try clearing the search or selected status</p>
           </div>
         ) : (
           <>
             {/* --- DESKTOP / TABLET TABLE (md and up) --- */}
-            <div className="hidden md:block overflow-x-auto">
+            <div className="hidden md:block overflow-x-auto overflow-y-visible min-h-[360px] pb-32">
               <table className="w-full text-left border-collapse whitespace-nowrap">
                 <thead>
-                  <tr className="text-[11px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50/40 border-b border-slate-100">
+                  <tr className="text-[11px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider bg-slate-50/60 dark:bg-[#0F172A] border-b border-slate-100 dark:border-[#272B40]">
                     <th className="py-3 px-6">Order ID</th>
+                    <th className="py-3 px-6">Products & Items</th>
                     <th className="py-3 px-6">Customer</th>
                     <th className="py-3 px-6">Date</th>
-                    <th className="py-3 px-6">Items Count</th>
+                    
                     <th className="py-3 px-6">Amount</th>
                     <th className="py-3 px-6">Payment</th>
                     <th className="py-3 px-6">Status</th>
-                    <th className="py-3 px-6 text-center">Fulfillment States Actions</th>
+                    <th className="py-3 px-6 text-center">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 text-xs">
-                  {filteredOrders.map((order) => (
-                    <tr key={order._id} className="hover:bg-slate-50/50 transition-colors group">
-                      {/* Order ID */}
-                      <td className="py-4 px-6 font-mono text-[11px] text-indigo-600 font-bold">
-                        {order.orderNumber || order._id?.slice(-8).toUpperCase()}
-                      </td>
-                      
-                      {/* Customer */}
-                      <td className="py-4 px-6">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-6 h-6 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-[9px] shadow-sm uppercase shrink-0">
-                            {order.user?.name ? order.user.name[0] : (order.shippingAddress?.fullName ? order.shippingAddress.fullName[0] : 'G')}
-                          </div>
-                          <div className="min-w-0">
-                            <span className="font-semibold text-slate-700 block leading-none truncate">{order.user?.name || order.shippingAddress?.fullName || 'Guest Customer'}</span>
-                            <span className="text-[10px] text-slate-400 mt-0.5 block truncate">{order.user?.email || 'No email'}</span>
-                          </div>
-                        </div>
-                      </td>
-                      
-                      {/* Date */}
-                      <td className="py-4 px-6 text-slate-400 font-medium">
-                        {order.createdAt ? new Date(order.createdAt).toLocaleDateString(undefined, { dateStyle: 'medium' }) : 'N/A'}
-                      </td>
-                      
-                      {/* Items */}
-                      <td className="py-4 px-6 text-slate-500 font-semibold">
-                        {order.items?.length || 0} items
-                      </td>
-                      
-                      {/* Amount */}
-                      <td className="py-4 px-6 font-bold text-slate-800 font-mono">
-                        ₹{(order.totalAmount || 0).toLocaleString('en-IN')}
-                      </td>
-                      
-                      {/* Payment status */}
-                      <td className="py-4 px-6">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                          order.paymentStatus === 'paid' 
-                            ? 'bg-green-50 text-green-700 border-green-200'
-                            : 'bg-amber-50 text-amber-700 border-amber-200'
-                        }`}>
-                          <span className="w-1 h-1 rounded-full bg-current" />
-                          {order.paymentStatus?.toUpperCase()}
-                        </span>
-                      </td>
-                      
-                      {/* Order status */}
-                      <td className="py-4 px-6">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${getStatusColorClass(order.orderStatus)}`}>
-                          <span className="w-1 h-1 rounded-full bg-current" />
-                          {order.orderStatus?.toUpperCase()}
-                        </span>
-                      </td>
-                      
-                      {/* Actions dropdown */}
-                      <td className="py-4 px-6 text-center">
-                        {/* position:relative lives on this div, not the <td> — table cells with
-                            border-collapse don't reliably form a containing block for absolutely
-                            positioned children in every browser, which lets the dropdown escape
-                            the cell and anchor far to the right of the (wide, scrollable) table. */}
-                        <div className="relative inline-block">
-                          <div className="flex justify-center gap-2">
-                            <button
-                              onClick={() => setSelectedOrder(order)}
-                              className="p-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-600 hover:text-indigo-700 transition-colors"
-                              title="Inspect Order & Print Assets"
-                            >
-                              <Eye size={14} />
-                            </button>
-                            <button
-                              onClick={() => setActiveMenuId(activeMenuId === order._id ? null : order._id)}
-                              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700"
-                            >
-                              <MoreVertical size={14} />
-                            </button>
-                          </div>
+                <tbody className="divide-y divide-slate-100 dark:divide-[#272B40] text-xs">
+                  {filteredOrders.map((order, idx) => {
+                    const isLastRows = idx >= Math.max(0, filteredOrders.length - 3);
+                    return (
+                      <tr key={order._id} className="hover:bg-indigo-50/30 dark:hover:bg-[#1E2235] transition-colors group">
+                        {/* Order ID */}
+                        <td className="py-4 px-6 font-mono text-[11px] text-indigo-600 font-bold">
+                          {order.orderNumber || order._id?.slice(-8).toUpperCase()}
+                        </td>
+                        <td className="py-4 px-6 min-w-[240px]">
+                          {order.items && order.items.length > 0 ? (
+                            <div className="space-y-2">
+                              {order.items.map((item, itemIdx) => {
+                                const imgUrl = getItemImage(item);
+                                const displayName = getItemDisplayName(item);
+                                const isCustom = isItemCustomized(item);
+                                return (
+                                  <div key={item._id || itemIdx} className="flex items-center gap-2.5">
+                                    <div className="w-10 h-10 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center shrink-0 overflow-hidden shadow-2xs">
+                                      {imgUrl ? (
+                                        <img
+                                          src={imgUrl}
+                                          alt={displayName}
+                                          crossOrigin="anonymous"
+                                          onError={(e) => {
+                                            e.target.onerror = null;
+                                            e.target.style.display = 'none';
+                                          }}
+                                          className="w-full h-full object-contain p-0.5"
+                                        />
+                                      ) : (
+                                        <PackageCheck size={18} className="text-slate-400" />
+                                      )}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className={`font-bold text-xs truncate max-w-[160px] ${isCustom ? 'text-indigo-600 dark:text-indigo-400' : 'text-indigo-500'}`}>
+                                          {displayName}
+                                        </span>
+                                        {isCustom && (
+                                          <span className="px-1.5 py-0.2 text-[9px] font-extrabold uppercase rounded bg-indigo-50 text-indigo-600 border border-indigo-200 shrink-0">
+                                            Custom
+                                          </span>
+                                        )}
+                                      </div>
+                                      <p className="text-[10px] text-slate-400 truncate max-w-[160px]">
+                                        {item.variantDescription || `Size: ${item.size || 'M'} / Color: ${item.color || 'Default'}`} • Qty: {item.quantity}
+                                      </p>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 italic">No items</span>
+                          )}
+                        </td>
 
-                          {activeMenuId === order._id && <StatusMenu order={order} />}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        {/* Customer */}
+                        <td className="py-4 px-6">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 text-white flex items-center justify-center font-bold text-[10px] shadow-sm uppercase shrink-0">
+                              {order.user?.name ? order.user.name[0] : (order.shippingAddress?.fullName ? order.shippingAddress.fullName[0] : 'G')}
+                            </div>
+                            <div className="min-w-0">
+                              <span className="font-semibold text-slate-700 block leading-none truncate">{order.user?.name || order.shippingAddress?.fullName || 'Guest Customer'}</span>
+                              <span className="text-[10px] text-slate-400 mt-0.5 block truncate">{order.user?.email || 'No email'}</span>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Date */}
+                        <td className="py-4 px-6 text-slate-400 font-medium">
+                          {order.createdAt ? new Date(order.createdAt).toLocaleDateString(undefined, { dateStyle: 'medium' }) : 'N/A'}
+                        </td>
+
+                        
+                        
+
+                        {/* Amount */}
+                        <td className="py-4 px-6 font-bold dark:text-white text-slate-800 font-mono tabular-nums">
+                          ₹{(order.totalAmount || 0).toLocaleString('en-IN')}
+                        </td>
+
+                        {/* Payment status */}
+                        <td className="py-4 px-6">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                            order.paymentStatus === 'paid'
+                              ? 'bg-green-50 text-green-700 border-green-200'
+                              : 'bg-amber-50 text-amber-700 border-amber-200'
+                          }`}>
+                            <span className="w-1 h-1 rounded-full bg-current" />
+                            {order.paymentStatus?.toUpperCase()}
+                          </span>
+                        </td>
+
+                        {/* Order status */}
+                        <td className="py-4 px-6">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${getStatusColorClass(order.orderStatus)}`}>
+                            <span className="w-1 h-1 rounded-full bg-current" />
+                            {order.orderStatus?.toUpperCase()}
+                          </span>
+                        </td>
+
+                        {/* Actions dropdown */}
+                        <td className="py-4 px-6 text-center">
+                          <div className="relative inline-block">
+                            <div className="flex justify-center gap-2">
+                              <button
+                                onClick={() => handleInspectOrder(order)}
+                                className="p-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-600 hover:text-indigo-700 transition-colors"
+                                title="Inspect Order & Print Assets"
+                              >
+                                <Eye size={14} />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  if (activeMenuId === order._id) {
+                                    setActiveMenuId(null);
+                                    setMenuAnchorEl(null);
+                                  } else {
+                                    setActiveMenuId(order._id);
+                                    setMenuAnchorEl(e.currentTarget);
+                                  }
+                                }}
+                                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 cursor-pointer"
+                              >
+                                <MoreVertical size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
 
             {/* --- MOBILE CARD LIST (below md) --- */}
-            <div className="md:hidden divide-y divide-slate-100">
-              {filteredOrders.map((order) => (
-                <div key={order._id} className="p-4 space-y-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-[10px] shadow-sm uppercase shrink-0">
-                        {order.user?.name ? order.user.name[0] : (order.shippingAddress?.fullName ? order.shippingAddress.fullName[0] : 'G')}
+            <div className="md:hidden divide-y divide-slate-100 pb-28">
+              {filteredOrders.map((order, idx) => {
+                const isLastRows = idx >= Math.max(0, filteredOrders.length - 2);
+                return (
+                  <div key={order._id} className="p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 text-white flex items-center justify-center font-bold text-[10px] shadow-sm uppercase shrink-0">
+                          {order.user?.name ? order.user.name[0] : (order.shippingAddress?.fullName ? order.shippingAddress.fullName[0] : 'G')}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-slate-700 text-xs truncate">{order.user?.name || order.shippingAddress?.fullName || 'Guest Customer'}</p>
+                          <p className="text-[10px] font-mono text-indigo-600 font-bold">{order.orderNumber || order._id?.slice(-8).toUpperCase()}</p>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <p className="font-semibold text-slate-700 text-xs truncate">{order.user?.name || order.shippingAddress?.fullName || 'Guest Customer'}</p>
-                        <p className="text-[10px] font-mono text-indigo-600 font-bold">{order.orderNumber || order._id?.slice(-8).toUpperCase()}</p>
+                      <div className="relative shrink-0">
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => handleInspectOrder(order)}
+                            className="p-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-600 transition-colors"
+                            title="Inspect Order & Print Assets"
+                          >
+                            <Eye size={14} />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              if (activeMenuId === order._id) {
+                                setActiveMenuId(null);
+                                setMenuAnchorEl(null);
+                              } else {
+                                setActiveMenuId(order._id);
+                                setMenuAnchorEl(e.currentTarget);
+                              }
+                            }}
+                            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 cursor-pointer"
+                          >
+                            <MoreVertical size={14} />
+                          </button>
+                        </div>
                       </div>
                     </div>
-                    <div className="relative shrink-0">
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => setSelectedOrder(order)}
-                          className="p-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-600 transition-colors"
-                          title="Inspect Order & Print Assets"
-                        >
-                          <Eye size={14} />
-                        </button>
-                        <button
-                          onClick={() => setActiveMenuId(activeMenuId === order._id ? null : order._id)}
-                          className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700"
-                        >
-                          <MoreVertical size={14} />
-                        </button>
-                      </div>
-                      {activeMenuId === order._id && <StatusMenu order={order} />}
-                    </div>
-                  </div>
 
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${getStatusColorClass(order.orderStatus)}`}>
-                      <span className="w-1 h-1 rounded-full bg-current" />
-                      {order.orderStatus?.toUpperCase()}
-                    </span>
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                      order.paymentStatus === 'paid' 
-                        ? 'bg-green-50 text-green-700 border-green-200'
-                        : 'bg-amber-50 text-amber-700 border-amber-200'
-                    }`}>
-                      <span className="w-1 h-1 rounded-full bg-current" />
-                      {order.paymentStatus?.toUpperCase()}
-                    </span>
-                  </div>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${getStatusColorClass(order.orderStatus)}`}>
+                        <span className="w-1 h-1 rounded-full bg-current" />
+                        {order.orderStatus?.toUpperCase()}
+                      </span>
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                        order.paymentStatus === 'paid'
+                          ? 'bg-green-50 text-green-700 border-green-200'
+                          : 'bg-amber-50 text-amber-700 border-amber-200'
+                      }`}>
+                        <span className="w-1 h-1 rounded-full bg-current" />
+                        {order.paymentStatus?.toUpperCase()}
+                      </span>
+                    </div>
 
-                  <div className="grid grid-cols-3 gap-2 text-[11px]">
-                    <div>
-                      <p className="text-slate-400 uppercase tracking-wide text-[9px] font-bold mb-0.5">Date</p>
-                      <p className="text-slate-600 font-medium">{order.createdAt ? new Date(order.createdAt).toLocaleDateString(undefined, { dateStyle: 'medium' }) : 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-400 uppercase tracking-wide text-[9px] font-bold mb-0.5">Items</p>
-                      <p className="text-slate-600 font-semibold">{order.items?.length || 0} items</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-400 uppercase tracking-wide text-[9px] font-bold mb-0.5">Amount</p>
-                      <p className="text-slate-800 font-bold font-mono">₹{(order.totalAmount || 0).toLocaleString('en-IN')}</p>
+                    {/* Ordered Products & Images */}
+                    {order.items && order.items.length > 0 && (
+                      <div className="bg-slate-50/80 rounded-xl p-3 space-y-2 border border-slate-100">
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Ordered Products</p>
+                        {order.items.map((item, itemIdx) => {
+                          const imgUrl = getItemImage(item);
+                          const displayName = getItemDisplayName(item);
+                          const isCustom = isItemCustomized(item);
+                          return (
+                            <div key={item._id || itemIdx} className="flex items-center gap-2.5">
+                              <div className="w-9 h-9 rounded-lg border border-slate-200 bg-white flex items-center justify-center shrink-0 overflow-hidden">
+                                {imgUrl ? (
+                                  <img
+                                    src={imgUrl}
+                                    alt={displayName}
+                                    crossOrigin="anonymous"
+                                    onError={(e) => {
+                                      e.target.onerror = null;
+                                      e.target.style.display = 'none';
+                                    }}
+                                    className="w-full h-full object-contain p-0.5"
+                                  />
+                                ) : (
+                                  <PackageCheck size={16} className="text-slate-400" />
+                                )}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`font-bold text-xs truncate ${isCustom ? 'text-indigo-600' : 'text-slate-800'}`}>
+                                    {displayName}
+                                  </span>
+                                  {isCustom && (
+                                    <span className="px-1.5 py-0.2 text-[9px] font-extrabold uppercase rounded bg-indigo-50 text-indigo-600 border border-indigo-200 shrink-0">
+                                      Custom
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[10px] text-slate-400 truncate">
+                                  {item.variantDescription || `Size: ${item.size || 'M'} / Color: ${item.color || 'Default'}`} × {item.quantity}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-3 gap-2 text-[11px] bg-slate-50/70 rounded-xl p-2.5">
+                      <div>
+                        <p className="text-slate-400 uppercase tracking-wide text-[9px] font-bold mb-0.5">Date</p>
+                        <p className="text-slate-600 font-medium">{order.createdAt ? new Date(order.createdAt).toLocaleDateString(undefined, { dateStyle: 'medium' }) : 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-400 uppercase tracking-wide text-[9px] font-bold mb-0.5">Items</p>
+                        <p className="text-slate-600 font-semibold">{order.items?.length || 0} items</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-400 uppercase tracking-wide text-[9px] font-bold mb-0.5">Amount</p>
+                        <p className="text-slate-800 font-bold font-mono tabular-nums">₹{(order.totalAmount || 0).toLocaleString('en-IN')}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </>
         )}
@@ -538,30 +891,37 @@ export default function Orders() {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
           <div className="bg-white dark:bg-slate-800 rounded-2xl sm:rounded-3xl w-full max-w-5xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden my-4 sm:my-8 max-h-[95vh] sm:max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-150">
             {/* Modal Header */}
-            <div className="px-4 sm:px-6 py-4 bg-slate-50 dark:bg-slate-900 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between shrink-0 gap-3">
+            <div className="px-4 sm:px-6 py-4 bg-gradient-to-r from-indigo-600 to-violet-600 flex items-center justify-between shrink-0 gap-3">
               <div className="min-w-0">
-                <h2 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 truncate">
-                  <Printer className="h-4 w-4 text-indigo-500 shrink-0" />
+                <h2 className="text-sm font-bold text-white flex items-center gap-2 truncate">
+                  <Printer className="h-4 w-4 text-white/80 shrink-0" />
                   <span className="truncate">Order #{selectedOrder.orderNumber || selectedOrder._id?.slice(-8).toUpperCase()} Inspector</span>
                 </h2>
-                <p className="text-[10px] text-slate-400">Placed on {selectedOrder.createdAt ? new Date(selectedOrder.createdAt).toLocaleString() : 'N/A'}</p>
+                <p className="text-[10px] text-indigo-100/90">Placed on {selectedOrder.createdAt ? new Date(selectedOrder.createdAt).toLocaleString() : 'N/A'}</p>
               </div>
               <button
                 onClick={() => setSelectedOrder(null)}
-                className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 flex items-center justify-center text-slate-500 dark:text-slate-300 font-bold transition-all cursor-pointer shrink-0"
+                className="w-8 h-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center text-white font-bold transition-all cursor-pointer shrink-0"
               >
-                ✕
+                <X size={15} />
               </button>
+            </div>
+
+            {/* Fulfillment progress rail */}
+            <div className="px-4 sm:px-6 py-4 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-100 dark:border-slate-700 shrink-0">
+              <FulfillmentRail status={selectedOrder.orderStatus} />
             </div>
 
             {/* Modal Body */}
             <div className="p-4 sm:p-6 overflow-y-auto flex-1 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
-              
+
               {/* Left Panel: Customer, Shipping, Timeline (4 cols) */}
               <div className="lg:col-span-4 space-y-5">
                 {/* Customer Details */}
                 <div className="bg-slate-50 dark:bg-slate-900/40 p-4 rounded-xl border border-slate-100 dark:border-slate-700 space-y-2">
-                  <h3 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Customer Details</h3>
+                  <h3 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <ShieldCheck size={13} className="text-indigo-400" /> Customer Details
+                  </h3>
                   <div className="text-xs space-y-1">
                     <p className="font-semibold text-slate-800 dark:text-slate-200">{selectedOrder.user?.name || selectedOrder.shippingAddress?.fullName || 'Guest'}</p>
                     <p className="text-slate-500">{selectedOrder.user?.email || 'No email provided'}</p>
@@ -571,7 +931,9 @@ export default function Orders() {
 
                 {/* Shipping Address */}
                 <div className="bg-slate-50 dark:bg-slate-900/40 p-4 rounded-xl border border-slate-100 dark:border-slate-700 space-y-2">
-                  <h3 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Shipping Address</h3>
+                  <h3 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <Truck size={13} className="text-indigo-400" /> Shipping Address
+                  </h3>
                   <div className="text-xs text-slate-600 dark:text-slate-300 space-y-1 leading-relaxed">
                     <p className="font-semibold">{selectedOrder.shippingAddress?.fullName || selectedOrder.shippingAddress?.name}</p>
                     <p>{selectedOrder.shippingAddress?.street}</p>
@@ -582,23 +944,25 @@ export default function Orders() {
 
                 {/* Order Summary & Pricing */}
                 <div className="bg-slate-50 dark:bg-slate-900/40 p-4 rounded-xl border border-slate-100 dark:border-slate-700 space-y-3">
-                  <h3 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Pricing Summary</h3>
+                  <h3 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <PackageCheck size={13} className="text-indigo-400" /> Pricing Summary
+                  </h3>
                   <div className="text-xs space-y-1.5">
                     <div className="flex justify-between text-slate-500">
                       <span>Subtotal:</span>
-                      <span className="font-mono font-semibold">₹{selectedOrder.subTotal?.toLocaleString('en-IN') || 0}</span>
+                      <span className="font-mono font-semibold tabular-nums">₹{selectedOrder.subTotal?.toLocaleString('en-IN') || 0}</span>
                     </div>
                     <div className="flex justify-between text-slate-500">
                       <span>Shipping:</span>
-                      <span className="font-mono font-semibold">₹{selectedOrder.shippingCharges?.toLocaleString('en-IN') || 0}</span>
+                      <span className="font-mono font-semibold tabular-nums">₹{selectedOrder.shippingCharges?.toLocaleString('en-IN') || 0}</span>
                     </div>
                     <div className="flex justify-between text-slate-500">
                       <span>Tax Amount (18%):</span>
-                      <span className="font-mono font-semibold">₹{selectedOrder.taxAmount?.toLocaleString('en-IN') || 0}</span>
+                      <span className="font-mono font-semibold tabular-nums">₹{selectedOrder.taxAmount?.toLocaleString('en-IN') || 0}</span>
                     </div>
                     <div className="border-t border-slate-200/60 dark:border-slate-700 pt-2 flex justify-between font-bold text-slate-800 dark:text-slate-100 text-sm">
                       <span>Total Paid:</span>
-                      <span className="font-mono text-indigo-600 dark:text-indigo-400 font-bold">₹{selectedOrder.totalAmount?.toLocaleString('en-IN') || 0}</span>
+                      <span className="font-mono text-indigo-600 dark:text-indigo-400 font-bold tabular-nums">₹{selectedOrder.totalAmount?.toLocaleString('en-IN') || 0}</span>
                     </div>
                   </div>
                 </div>
@@ -606,21 +970,30 @@ export default function Orders() {
 
               {/* Right Panel: Order Items and Canvas Layer Inspector (8 cols) */}
               <div className="lg:col-span-8 space-y-6">
-                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Ordered Items & Printable Assets</h3>
-                
+                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                  <ChevronRight size={13} className="text-indigo-400" /> Ordered Items & Printable Assets
+                </h3>
+
                 {selectedOrder.items?.map((item, itemIdx) => {
                   const layers = getLayerDetails(item.customization);
-                  
+
                   return (
                     <div key={item._id || itemIdx} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
                       {/* Item Info Header */}
                       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-4">
                         <div className="min-w-0">
-                          <h4 className="font-bold text-slate-800 dark:text-slate-100 text-sm">{item.productName}</h4>
+                          <h4 className="font-bold text-slate-800 dark:text-slate-100 text-sm flex items-center gap-2">
+                            <span>{getItemDisplayName(item)}</span>
+                            {isItemCustomized(item) && (
+                              <span className="px-2 py-0.5 text-[9px] font-extrabold uppercase rounded-full bg-indigo-50 text-indigo-600 border border-indigo-200 shrink-0">
+                                Customized
+                              </span>
+                            )}
+                          </h4>
                           <p className="text-[10px] text-indigo-500 dark:text-indigo-400 font-semibold uppercase tracking-wider mt-0.5">{item.variantDescription || `Size: ${item.size} / Color: ${item.color}`}</p>
                         </div>
                         <div className="text-left sm:text-right shrink-0">
-                          <span className="text-xs font-bold text-slate-700 dark:text-slate-300 font-mono">₹{item.price} × {item.quantity}</span>
+                          <span className="text-xs font-bold text-slate-700 dark:text-slate-300 font-mono tabular-nums">₹{item.price} × {item.quantity}</span>
                           <p className="text-[10px] text-slate-400 mt-0.5">Subtotal: ₹{item.price * item.quantity}</p>
                         </div>
                       </div>
@@ -629,21 +1002,14 @@ export default function Orders() {
                       {item.customization ? (
                         <div className="border-t border-slate-100 dark:border-slate-700 pt-4 space-y-4">
                           <div className="flex flex-col md:flex-row gap-5">
-                            
+
                             {/* Live Mockup / 3D Model Previews */}
                             <div className="w-full md:w-1/3 space-y-2">
                               {(() => {
-                                const isCustomProduct = Boolean(
-                                  item.isTemplate ||
-                                  item.clothingType ||
-                                  item.customization?.decalUrl ||
-                                  item.customization?.previewUrl ||
-                                  item.customization?.previews?.front ||
-                                  (Array.isArray(item.customization?.layers) && item.customization?.layers.length > 0) ||
-                                  item.customization?.editableDesignJSON
-                                );
+                                const isCustomProduct = isItemCustomized(item);
 
                                 const displayProductImage =
+                                  getItemImage(item) ||
                                   item.image ||
                                   item.imageUrl ||
                                   item.product?.images?.[0]?.url ||
@@ -652,7 +1018,7 @@ export default function Orders() {
                                   item.productVariant?.images?.[0]?.url ||
                                   item.customization?.previewUrl ||
                                   item.customization?.previews?.front ||
-                                  'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=400&q=80';
+                                  null;
 
                                 return (
                                   <>
@@ -695,31 +1061,12 @@ export default function Orders() {
                                   </>
                                 );
                               })()}
-                              
-                              {/* ZIP / JSON Downloads */}
-                              <div className="grid grid-cols-2 gap-2">
-                                {/* <button
-                                  onClick={() => {
-                                    const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
-                                      JSON.stringify(item.customization.editableDesignJSON, null, 2)
-                                    )}`;
-                                    const dl = document.createElement("a");
-                                    dl.setAttribute("href", jsonString);
-                                    dl.setAttribute("download", `customization_layers_${item._id}.json`);
-                                    dl.click();
-                                  }}
-                                  className="flex items-center justify-center gap-1.5 py-2 px-3 border border-slate-200 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-750 rounded-lg text-[10px] font-bold text-slate-700 dark:text-slate-300 transition-colors"
-                                >
-                                  <Download size={10} /> JSON Config
-                                </button> */}
-                              
-                              </div>
                             </div>
 
                             {/* Detailed Layers & Dimensions List */}
                             <div className="flex-1 space-y-2 min-w-0">
                               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Layer Geometry Dimensions (inches)</span>
-                              
+
                               {layers.length === 0 ? (
                                 <p className="text-xs text-slate-400 italic">No customizable layer coordinates registered.</p>
                               ) : (
@@ -739,8 +1086,8 @@ export default function Orders() {
                                           <td className="py-2 px-3 font-semibold text-slate-500 whitespace-nowrap">{layer.view}</td>
                                           <td className="py-2 px-3">
                                             <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase whitespace-nowrap ${
-                                              layer.type === 'Text' 
-                                                ? 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400' 
+                                              layer.type === 'Text'
+                                                ? 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400'
                                                 : 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400'
                                             }`}>
                                               {layer.type}
@@ -761,9 +1108,9 @@ export default function Orders() {
                                                <div className="flex items-center gap-1.5">
                                                  {layer.src ? (
                                                    <>
-                                                     <img 
-                                                       src={layer.src} 
-                                                       alt="thumbnail" 
+                                                     <img
+                                                       src={layer.src}
+                                                       alt="thumbnail"
                                                        crossOrigin="anonymous"
                                                        onClick={() => handleOpenGraphicPreview(layer.src)}
                                                        title="Click to view full preview"
@@ -771,7 +1118,7 @@ export default function Orders() {
                                                          e.target.onerror = null;
                                                          e.target.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="%2394a3b8" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5-11 11"/></svg>';
                                                        }}
-                                                       className="w-6 h-6 object-contain rounded bg-slate-50 border border-slate-200 shrink-0 cursor-pointer hover:opacity-80 transition-opacity" 
+                                                       className="w-6 h-6 object-contain rounded bg-slate-50 border border-slate-200 shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
                                                      />
                                                      <button
                                                        type="button"
@@ -787,7 +1134,7 @@ export default function Orders() {
                                                </div>
                                              )}
                                            </td>
-                                          <td className="py-2 px-3 text-right font-mono font-bold text-slate-800 dark:text-slate-100 whitespace-nowrap">
+                                          <td className="py-2 px-3 text-right font-mono font-bold text-slate-800 dark:text-slate-100 whitespace-nowrap tabular-nums">
                                             {layer.widthInches}" × {layer.heightInches}"
                                           </td>
                                         </tr>
@@ -869,6 +1216,18 @@ export default function Orders() {
             </div>
           </div>
         </div>
+      )}
+      {/* React Portal Status Menu */}
+      {activeMenuId && menuAnchorEl && (
+        <StatusMenu
+          order={orders.find((o) => o._id === activeMenuId)}
+          anchorEl={menuAnchorEl}
+          onClose={() => {
+            setActiveMenuId(null);
+            setMenuAnchorEl(null);
+          }}
+          onUpdateStatus={handleUpdateStatus}
+        />
       )}
     </div>
   );

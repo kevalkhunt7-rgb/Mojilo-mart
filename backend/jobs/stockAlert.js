@@ -13,8 +13,8 @@ export const checkLowStocks = async () => {
 
 
       const alreadyNotified = await Notification.findOne({
-        title: 'Low Stock Alert',
-        message: { $regex: variantSku },
+        type: 'stock_alert',
+        sku: variantSku,
         isRead: false
       });
 
@@ -22,6 +22,7 @@ export const checkLowStocks = async () => {
         await Notification.create({
           user: null, // Admin alert
           title: 'Low Stock Alert',
+          sku: variantSku,
           message: `Product '${prodName}' (SKU: ${variantSku}) in ${whName} has only ${stock.quantity} items left (Threshold: ${stock.lowStockThreshold}).`,
           type: 'stock_alert'
         });

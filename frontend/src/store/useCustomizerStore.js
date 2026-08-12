@@ -1,7 +1,8 @@
 import { create } from "zustand";
+import { calculateCustomizationCost, getElementBreakdown } from "../utils/pricingUtils";
 
 const BASE_PRICES = {
-  "half-sleeve": 299,
+  "half-sleeve": 249,
   "long-sleeve": 399,
   "oversized": 449,
   "hoodie": 699,
@@ -50,7 +51,33 @@ export const useCustomizerStore = create((set, get) => ({
   redoStack: [],
 
   // Setters
-  setApparelTemplates: (templates) => set({ apparelTemplates: templates }),
+  setApparelTemplates: (templates) => set((state) => {
+    const activeTemplates = Object.values(templates).filter(Boolean);
+    const currentTemplate = templates[state.currentProduct];
+    const selectedTemplate = currentTemplate || activeTemplates[0];
+
+    // A product may have been disabled in the admin panel while this page was open.
+    const currentProduct = currentTemplate ? state.currentProduct : (selectedTemplate?.key || state.currentProduct);
+    const colors = selectedTemplate?.availableColors || [];
+    const enabledSizes = (selectedTemplate?.sizes || []).filter((size) => size.enabled);
+    const productColor = colors.includes(state.productColor) ? state.productColor : (colors[0] || state.productColor);
+    const productSize = enabledSizes.some((size) => size.size === state.productSize)
+      ? state.productSize
+      : (enabledSizes[0]?.size || state.productSize);
+    const basePrice = selectedTemplate?.basePrice ?? BASE_PRICES[currentProduct] ?? state.pricingDetails.base;
+
+    return {
+      apparelTemplates: templates,
+      currentProduct,
+      productColor,
+      productSize,
+      pricingDetails: {
+        ...state.pricingDetails,
+        base: basePrice,
+        total: basePrice + state.pricingDetails.text + state.pricingDetails.image + state.pricingDetails.ai + state.pricingDetails.area + state.pricingDetails.extra,
+      },
+    };
+  }),
 
   setCurrentProduct: (product) => {
     const state = get();
@@ -121,18 +148,10 @@ export const useCustomizerStore = create((set, get) => ({
     const liveTemplate = state.apparelTemplates?.[state.currentProduct];
     const basePrice = liveTemplate?.basePrice ?? BASE_PRICES[state.currentProduct] ?? 19.99;
 
-    // ── Pricing rates ────────────────────────────────────────────────────────
-    // 50 px = 1 physical inch (matches apparelConfig: 600px canvas / 12" = 50 px/in)
-    const PX_PER_INCH         = 50;
-    const RATE_PER_SQ_INCH    = 1.00;   // ₹1.00 per sq inch of ink coverage
-    const MINIMUM_VIEW_COST   = 30.00;  // ₹30 minimum charge per active view/side
-
-    // Per-layer flat fees — set to 0: ink coverage area already captures cost.
-    // Uncomment and set non-zero if your business charges additional layer fees.
-    const costPerText         = 0;
-    const costPerUpload       = 0;
-    const costPerAI           = 0;
-    const costPerExtraSide    = 0;    // extra charge for each view beyond the first
+    const costPerText      = 0;
+    const costPerUpload    = 0;
+    const costPerAI        = 0;
+    const costPerExtraSide = 0;
 
     let textCost     = 0.0;
     let imageCost    = 0.0;
@@ -143,16 +162,19 @@ export const useCustomizerStore = create((set, get) => ({
     Object.entries(canvasesData).forEach(([viewKey, objects]) => {
       if (!objects || objects.length === 0) return;
 
+      // Filter out printable elements for view count check
+      const printableObjects = objects.filter((obj) => {
+        if (!obj || obj.visible === false) return false;
+        if (obj.isBackground || obj.isOverlay || obj.isHelper || obj.isGrid || obj.isPrintAreaBox) return false;
+        if (obj.id === "grid" || obj.id === "background" || obj.name === "grid") return false;
+        return (obj.width || 0) > 0 && (obj.height || 0) > 0;
+      });
+
+      if (printableObjects.length === 0) return;
+
       activeViewsCount++;
 
-      // ── FIX #2: Sum individual object areas (not a single bounding-box union)
-      // A bounding-box union charges for empty space between objects placed far
-      // apart (e.g. collar text + hem graphic). Summing each object's own area
-      // charges only for actual ink coverage.
-      let viewAreaPx = 0;
-
-      objects.forEach((obj) => {
-        // ── FIX #3: Per-layer flat fees are all 0; kept here for future config ─
+      printableObjects.forEach((obj) => {
         if (obj.type === "textbox" || obj.type === "text" || obj.type === "i-text") {
           textCost += costPerText;
         } else if (obj.type === "image" || obj.type === "Image") {
@@ -162,37 +184,28 @@ export const useCustomizerStore = create((set, get) => ({
             imageCost += costPerUpload;
           }
         }
-
-        // Accumulate this object's individual pixel area (scale-aware)
-        const scaleX = obj.scaleX || 1;
-        const scaleY = obj.scaleY || 1;
-        const w = (obj.width  || 0) * scaleX;
-        const h = (obj.height || 0) * scaleY;
-        viewAreaPx += w * h;
       });
 
-      // Convert total pixel area to sq-inches, then to cost
-      const sqInches = viewAreaPx / (PX_PER_INCH * PX_PER_INCH);
-      const rawViewCost = sqInches * RATE_PER_SQ_INCH;
-
-      // ── FIX #1: Enforce ₹30 minimum per active view ──────────────────────
-      areaCost += Math.max(MINIMUM_VIEW_COST, rawViewCost);
+      // Calculate ink area price PER INDIVIDUAL DESIGN ELEMENT
+      const viewDesignCost = calculateCustomizationCost(printableObjects);
+      areaCost += viewDesignCost;
     });
 
-    // Extra side cost (if more than 1 view contains designs)
     const extraPrintAreaCost = activeViewsCount > 1 ? (activeViewsCount - 1) * costPerExtraSide : 0.0;
-
     const total = basePrice + textCost + imageCost + aiCost + areaCost + extraPrintAreaCost;
+
+    const elementList = getElementBreakdown(canvasesData);
 
     set({
       pricingDetails: {
-        base:  parseFloat(basePrice.toFixed(2)),
-        text:  parseFloat(textCost.toFixed(2)),
-        image: parseFloat(imageCost.toFixed(2)),
-        ai:    parseFloat(aiCost.toFixed(2)),
-        area:  parseFloat(areaCost.toFixed(2)),
-        extra: parseFloat(extraPrintAreaCost.toFixed(2)),
-        total: parseFloat(total.toFixed(2)),
+        base:     parseFloat(basePrice.toFixed(2)),
+        text:     parseFloat(textCost.toFixed(2)),
+        image:    parseFloat(imageCost.toFixed(2)),
+        ai:       parseFloat(aiCost.toFixed(2)),
+        area:     parseFloat(areaCost.toFixed(2)),
+        extra:    parseFloat(extraPrintAreaCost.toFixed(2)),
+        total:    parseFloat(total.toFixed(2)),
+        elements: elementList,
       },
     });
   },

@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import { useParams, Link } from 'react-router-dom';
 import { Heart, Plus, Minus, Truck, RotateCcw, Loader2 } from 'lucide-react';
 
 import RelatedProducts from '../components/RelatedProduct';
+import ProductReviews from '../components/ProductReviews';
 import { useWishlist } from '../context/WishlistContext';
 import { useCart } from '../context/CartContext';
 import api from '../lib/axios';
@@ -94,8 +95,37 @@ export default function ProductDetails() {
       directSizes = Array.from(variantSizes);
     }
 
-    return directSizes;
+    return directSizes.map((s) => {
+      if (typeof s === 'object' && s !== null) {
+        return {
+          size: (s.size || s.name || '').toString().trim(),
+          price: s.price !== undefined && s.price !== null ? Number(s.price) : (product?.salePrice || product?.basePrice || product?.price || 0)
+        };
+      }
+      return {
+        size: String(s).trim(),
+        price: product?.salePrice || product?.basePrice || product?.price || 0
+      };
+    }).filter((s) => s.size);
   };
+
+  const displayPrice = useMemo(() => {
+    if (!product) return 0;
+    const sizesList = getProductSizes();
+    if (selectedSize) {
+      const matched = sizesList.find((s) => s.size === selectedSize);
+      if (matched && matched.price != null && !isNaN(matched.price)) {
+        return matched.price;
+      }
+    }
+    if (sizesList.length > 0) {
+      const prices = sizesList.map((s) => s.price).filter((p) => typeof p === 'number' && p > 0);
+      if (prices.length > 0) {
+        return Math.min(...prices);
+      }
+    }
+    return product.salePrice || product.basePrice || product.price || 0;
+  }, [product, selectedSize]);
 
   const getColorDisplayName = (colorValue) => {
     if (!colorValue) return '';
@@ -159,7 +189,7 @@ export default function ProductDetails() {
       setSelectedColor(initialColor);
 
       const sizesList = getProductSizes();
-      setSelectedSize(sizesList && sizesList[0] ? sizesList[0] : '');
+      setSelectedSize(sizesList && sizesList[0] ? sizesList[0].size : '');
       setQuantity(1);
     }
   }, [product]);
@@ -239,25 +269,33 @@ export default function ProductDetails() {
     const colorId = typeof colorData === 'object' ? colorData.id : colorData;
     const variantId = `${product._id || product.id}-${colorId}-${selectedSize}`;
 
+    // Extract explicit dynamic size price override if configured on product.sizes
+    const selectedSizeObj = Array.isArray(product.sizes)
+      ? product.sizes.find(s => {
+          const sizeValue = typeof s === 'object' && s !== null ? String(s.size) : String(s);
+          return sizeValue === String(selectedSize);
+        })
+      : null;
+    const activePrice = (selectedSizeObj && typeof selectedSizeObj === 'object' && selectedSizeObj.price != null && selectedSizeObj.price !== '')
+      ? Number(selectedSizeObj.price)
+      : Number(product.salePrice ?? product.basePrice ?? product.price ?? displayPrice ?? 0);
+
     // Prepare item safely for data transfer
     const itemWithVariants = {
       ...product,
+      productId: product._id || product.id,
       cartItemId: variantId,
       selectedColor: colorData,
       selectedSize,
-      price: (product.salePrice && Number(product.salePrice) > 0) ? Number(product.salePrice) : (product.price || product.basePrice || 0),
+      size: selectedSize,
+      price: activePrice,
+      quantity,
       title: product.name || product.title,
       image: selectedImage
     };
 
     try {
-      let selectedVariantId = null;
-      if (product.variants && product.variants.length > 0) {
-        const found = product.variants.find(v => v.size === selectedSize && v.color === colorId);
-        selectedVariantId = found?._id;
-      }
-
-      await addToCart(product._id || product.id, selectedVariantId, quantity, null);
+      await addToCart(itemWithVariants);
 
       toast.success(`"${displayTitle}" added to cart!`);
     } catch (err) {
@@ -266,7 +304,6 @@ export default function ProductDetails() {
   };
 
   const displayTitle = product.name || product.title || 'Product Details';
-  const displayPrice = (product.salePrice && Number(product.salePrice) > 0) ? Number(product.salePrice) : (product.price || product.basePrice || 0);
   const basePriceCut = (product.salePrice && Number(product.salePrice) > 0 && product.basePrice && Number(product.basePrice) > Number(product.salePrice)) ? Number(product.basePrice) : null;
   const displayDesc = product.description || 'No description available.';
 
@@ -392,18 +429,28 @@ export default function ProductDetails() {
                     )}
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {getProductSizes().map((size) => (
-                      <button
-                        key={size}
-                        onClick={() => setSelectedSize(size)}
-                        className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all uppercase
-                          ${selectedSize === size
-                            ? 'bg-[#1A1A1A] border-[#1A1A1A] text-white'
-                            : 'bg-white border-slate-200 text-slate-600 hover:border-slate-400'}`}
-                      >
-                        {size}
-                      </button>
-                    ))}
+                    {getProductSizes().map((sObj) => {
+                      const szName = typeof sObj === 'object' ? sObj.size : sObj;
+                      const szPrice = typeof sObj === 'object' ? sObj.price : null;
+                      const isSelected = selectedSize === szName;
+                      return (
+                        <button
+                          key={szName}
+                          onClick={() => setSelectedSize(szName)}
+                          className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all uppercase flex items-center gap-1.5
+                            ${isSelected
+                              ? 'bg-[#1A1A1A] border-[#1A1A1A] text-white shadow-sm'
+                              : 'bg-white border-slate-200 text-slate-600 hover:border-slate-400'}`}
+                        >
+                          <span>{szName}</span>
+                          {szPrice && szPrice !== (product.salePrice || product.basePrice) && (
+                            <span className={`text-[10px] font-semibold ${isSelected ? 'text-amber-300' : 'text-slate-400'}`}>
+                              (₹{szPrice})
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -477,16 +524,7 @@ export default function ProductDetails() {
             </div>
 
             {/* Delivery Info Badges */}
-            <div className="grid grid-cols-2 gap-4 pt-4 text-xs font-semibold text-slate-500">
-              <div className="flex items-center space-x-3 bg-white p-3 rounded-xl border border-slate-100">
-                <Truck className="w-5 h-5 text-[#936A3B]" />
-                <span>Free Shipping in India</span>
-              </div>
-              <div className="flex items-center space-x-3 bg-white p-3 rounded-xl border border-slate-100">
-                <RotateCcw className="w-5 h-5 text-[#936A3B]" />
-                <span>7-Day Return Policy</span>
-              </div>
-            </div>
+          
 
             {/* Apparel Specifications Grid */}
             <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm space-y-4">
@@ -583,17 +621,22 @@ export default function ProductDetails() {
           </div>
         </div>
 
+        {/* REVIEWS AND RATINGS SYSTEM */}
+        {product && (
+          <ProductReviews
+            productId={product._id || product.id}
+            product={product}
+          />
+        )}
+
         {/* RELATED PRODUCTS */}
-        {safeCategoryName && (
-          <div className="mt-20">
-            <h2 className="text-xl font-black text-slate-900 uppercase tracking-wide mb-6">
-              You May Also Like
-            </h2>
-            <RelatedProducts
-              category={safeCategoryName}
-              currentProductId={product._id || product.id}
-            />
-          </div>
+        {product && (
+          <RelatedProducts
+            currentProduct={product}
+            currentProductId={product._id || product.id}
+            category={product.category || safeCategoryName}
+            gender={product.gender}
+          />
         )}
 
       </div>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import api from '../lib/axios';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { Search, Plus, Layers, Eye, RefreshCw, Upload } from 'lucide-react';
@@ -14,7 +14,7 @@ export default function DesignTemplatesPage() {
     setLoading(true);
     try {
       // Query admin designs to use as canvas templates
-      const res = await axios.get('/api/designs', { withCredentials: true });
+      const res = await api.get('/designs');
       setTemplates(res.data?.data || []);
     } catch (err) {
       toast.error('Failed to load canvas templates');

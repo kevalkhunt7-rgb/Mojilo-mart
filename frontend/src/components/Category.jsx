@@ -8,7 +8,7 @@ export default function Category() {
   const navigate = useNavigate();
 
   return (
-    <section className="w-full py-8 sm:py-12 lg:py-16 px-4 sm:px-8 md:px-12 lg:px-24 flex flex-col items-center overflow-hidden">
+    <section className="w-full py-8 bg-[#FCFCFC] sm:py-12 lg:py-1  px-4 sm:px-8 md:px-12  flex flex-col items-center overflow-hidden">
 
       {/* ── HEADING ── */}
       <div className="text-center mb-6 sm:mb-10">

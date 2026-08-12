@@ -73,6 +73,28 @@ class InventoryRepository extends BaseRepository {
     return true;
   }
 
+  async restoreStock(variant, quantity) {
+    if (!variant || quantity <= 0) return true;
+
+    const variantId = typeof variant === 'object' ? (variant._id || variant.id) : variant;
+    if (!variantId) return true;
+
+    const stockItems = await Inventory.find({ variant: variantId }).sort({ quantity: 1 });
+    if (stockItems.length > 0) {
+      stockItems[0].quantity += quantity;
+      await stockItems[0].save();
+      return true;
+    }
+
+    const dbVariant = await ProductVariant.findById(variantId);
+    if (dbVariant && typeof dbVariant.inventory === 'number') {
+      dbVariant.inventory += quantity;
+      await dbVariant.save();
+    }
+
+    return true;
+  }
+
   async getLowStockItems() {
     return await Inventory.find({
       $expr: { $lte: ['$quantity', '$lowStockThreshold'] }

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
+import { GoogleLogin } from '@react-oauth/google';
 import LogoForContactUs from '../assets/LogoForContactUs.png';
 import { useAuth } from '../context/AuthContext';
+import { isValidEmail } from '../utils/validation';
 
 /* ─── Inline keyframe styles ─────────────────────────────────────────────── */
 const styles = `
@@ -71,7 +73,7 @@ const styles = `
 
 const AuthPage = () => {
   const navigate  = useNavigate();
-  const { login, signup, verifyEmailOtp, isAuthenticated } = useAuth();
+  const { login, signup, verifyEmailOtp, googleLogin, isAuthenticated } = useAuth();
 
   const [viewMode, setViewMode] = useState('signup'); // 'signup', 'login', 'verify'
   const [error, setError]       = useState('');
@@ -100,21 +102,28 @@ const AuthPage = () => {
 
   const handleFormSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
+
+    const emailTrimmed = (authForm.identifier || '').trim();
+    if (!isValidEmail(emailTrimmed)) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+
+    setLoading(true);
     
     try {
       if (viewMode === 'signup') {
-        const result = await signup(authForm.name, authForm.identifier, authForm.password);
+        const result = await signup(authForm.name, emailTrimmed, authForm.password);
         toast.success(result.message || 'OTP verification sent to your email.');
         setViewMode('verify');
         setFormKey(k => k + 1);
       } else if (viewMode === 'verify') {
-        const result = await verifyEmailOtp(authForm.identifier, otpCode);
+        const result = await verifyEmailOtp(emailTrimmed, otpCode);
         toast.success(result.message || 'Email verified successfully! You can now log in.');
         switchMode('login');
       } else {
-        await login(authForm.identifier, authForm.password);
+        await login(emailTrimmed, authForm.password);
         toast.success('Welcome back to Mojilo!');
         navigate('/my-profile');
       }
@@ -123,6 +132,28 @@ const AuthPage = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleGoogleSuccess = async (credentialResponse) => {
+    if (!credentialResponse?.credential) {
+      toast.error('Google login failed. Credential not received.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      await googleLogin(credentialResponse.credential);
+      toast.success('Signed in with Google successfully!');
+      navigate('/my-profile');
+    } catch (err) {
+      setError(err.message || 'Google authentication failed.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleError = () => {
+    setError('Google Sign-In was unsuccessful or closed.');
   };
 
   const inputClass =
@@ -331,17 +362,39 @@ const AuthPage = () => {
                     </button>
                   )}
 
-                  {viewMode === 'signup' && (
-                    <button
-                      type="button"
-                      onClick={() => toast('Google authentication is handled by the backend OAuth settings.', { icon: '🔒' })}
-                      className="w-full bg-white border border-slate-200 hover:bg-slate-50 active:scale-[0.985] text-slate-600 font-bold text-xs sm:text-sm py-3.5 rounded-xl transition-all duration-200 flex items-center justify-center gap-3"
-                    >
-                      <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
-                        <path fill="#EA4335" d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.114-5.136 4.114A5.772 5.772 0 0 1 8.2 12.74a5.772 5.772 0 0 1 5.79-5.773c1.498 0 2.86.516 3.944 1.516l3.051-3.051C19.102 3.655 16.71 2.7 13.99 2.7 8.528 2.7 4.1 7.128 4.1 12.59c0 5.461 4.428 9.89 9.89 9.89 6.014 0 9.855-4.226 9.855-10.034 0-.629-.055-1.22-.165-1.78l-11.44-.38z"/>
-                      </svg>
-                      <span className="uppercase tracking-wider">Continue with Google</span>
-                    </button>
+                  {viewMode !== 'verify' && (
+                    <div className="pt-2 space-y-3">
+                      <div className="relative w-full flex items-center justify-center my-1">
+                        <div className="border-t border-slate-200 w-full" />
+                        <span className="bg-white px-3 text-[11px] uppercase font-bold text-slate-400 shrink-0">OR</span>
+                        <div className="border-t border-slate-200 w-full" />
+                      </div>
+                      <div className="w-full flex justify-center">
+                        {import.meta.env.VITE_GOOGLE_CLIENT_ID && import.meta.env.VITE_GOOGLE_CLIENT_ID !== 'your_google_client_id_here' ? (
+                          <GoogleLogin
+                            onSuccess={handleGoogleSuccess}
+                            onError={handleGoogleError}
+                            useOneTap
+                            theme="outline"
+                            size="large"
+                            width="360"
+                            text={viewMode === 'signup' ? 'signup_with' : 'signin_with'}
+                            shape="rectangular"
+                          />
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => toast('To test Google Login, add your Google OAuth Client ID to VITE_GOOGLE_CLIENT_ID in frontend/.env', { icon: '🔑', duration: 5000 })}
+                            className="w-full bg-white border border-slate-200 hover:bg-slate-50 active:scale-[0.985] text-slate-600 font-bold text-xs sm:text-sm py-3.5 rounded-xl transition-all duration-200 flex items-center justify-center gap-3"
+                          >
+                            <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                              <path fill="#EA4335" d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.114-5.136 4.114A5.772 5.772 0 0 1 8.2 12.74a5.772 5.772 0 0 1 5.79-5.773c1.498 0 2.86.516 3.944 1.516l3.051-3.051C19.102 3.655 16.71 2.7 13.99 2.7 8.528 2.7 4.1 7.128 4.1 12.59c0 5.461 4.428 9.89 9.89 9.89 6.014 0 9.855-4.226 9.855-10.034 0-.629-.055-1.22-.165-1.78l-11.44-.38z"/>
+                            </svg>
+                            <span className="uppercase tracking-wider">Continue with Google</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   )}
                 </div>
               </form>

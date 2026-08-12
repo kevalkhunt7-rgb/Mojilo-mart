@@ -88,13 +88,13 @@ export function HoodieModel({
           frontZ + frontDecalOffset[2],
         ],
         rotation: [0, 0, 0],
-        scale: [baseScale * 2, baseScale * 2.5, depth],
+        scale: [baseScale * 1.7, baseScale * 2.5, depth],
       },
       back: {
         position: [
           center.x + backDecalOffset[0],
           chestY + backDecalOffset[1],
-          backZ + backDecalOffset[1],
+          backZ + backDecalOffset[2],
         ],
         rotation: [0, Math.PI, 0],
         scale: [baseScale * 2, baseScale * 2.8, depth],

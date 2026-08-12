@@ -5,6 +5,8 @@ import { useOrders } from '../context/OrdersContext';
 import { useWishlist } from '../context/WishlistContext';
 import ProductCard from '../components/ProductCard';
 import  CartItem3DViewer  from '../components/CartItem3DViewer'; // Ensure correct relative path
+import api from '../lib/axios';
+import { isValidPhone, sanitizePhoneInput } from '../utils/validation';
 import {
   User, Heart, ShoppingBag,Maximize2, MapPin, CreditCard,
   LogOut, CheckCircle, Camera, Menu, X, ChevronRight
@@ -61,7 +63,7 @@ const sidebarItems = [
   { id: 'My Orders', label: 'My Orders', icon: ShoppingBag },
   { id: 'My Wishlist', label: 'My Wishlist', icon: Heart },
   { id: 'Address Book', label: 'Address Book', icon: MapPin },
-  { id: 'Payment Methods', label: 'Payment Methods', icon: CreditCard },
+  
 ];
 
 /* ════════════════════════════════════════════════════════════════════════════ */
@@ -80,6 +82,105 @@ const [selected3DItem, setSelected3DItem] = useState(null);
       getUserOrders();
     }
   }, [activeTab]);
+
+  const [addresses, setAddresses] = useState([]);
+  const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
+  const [editingAddress, setEditingAddress] = useState(null);
+  const [addressFormData, setAddressFormData] = useState({
+    name: '',
+    phone: '',
+    street: '',
+    city: '',
+    state: 'Karnataka',
+    zipCode: '',
+    country: 'India',
+    isDefaultShipping: false
+  });
+
+  const fetchAddresses = async () => {
+    try {
+      const res = await api.get('/addresses');
+      if (res.data && res.data.success) {
+        setAddresses(res.data.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch addresses:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'Address Book') {
+      fetchAddresses();
+    }
+  }, [activeTab]);
+
+  const handleOpenAddAddress = () => {
+    setEditingAddress(null);
+    setAddressFormData({
+      name: `${user?.name || ''}`.trim(),
+      phone: '',
+      street: '',
+      city: '',
+      state: 'Karnataka',
+      zipCode: '',
+      country: 'India',
+      isDefaultShipping: addresses.length === 0
+    });
+    setIsAddressModalOpen(true);
+  };
+
+  const handleOpenEditAddress = (addr) => {
+    setEditingAddress(addr);
+    setAddressFormData({
+      name: addr.name || '',
+      phone: addr.phone || '',
+      street: addr.street || '',
+      city: addr.city || '',
+      state: addr.state || '',
+      zipCode: addr.zipCode || '',
+      country: addr.country || 'India',
+      isDefaultShipping: !!addr.isDefaultShipping
+    });
+    setIsAddressModalOpen(true);
+  };
+
+  const handleSaveAddress = async (e) => {
+    e.preventDefault();
+    if (!addressFormData.name || !addressFormData.street || !addressFormData.city || !addressFormData.state || !addressFormData.zipCode || !addressFormData.phone) {
+      toast.error('Please fill in all required address fields.');
+      return;
+    }
+
+    if (!isValidPhone(addressFormData.phone)) {
+      toast.error('Please enter a valid 10-digit phone number.');
+      return;
+    }
+
+    try {
+      if (editingAddress) {
+        await api.put(`/addresses/${editingAddress._id}`, addressFormData);
+        toast.success('Address updated successfully!');
+      } else {
+        await api.post('/addresses', addressFormData);
+        toast.success('Address added successfully!');
+      }
+      setIsAddressModalOpen(false);
+      setEditingAddress(null);
+      fetchAddresses();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to save address.');
+    }
+  };
+
+  const handleDeleteAddress = async (addressId) => {
+    try {
+      await api.delete(`/addresses/${addressId}`);
+      toast.success('Address removed.');
+      fetchAddresses();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to remove address.');
+    }
+  };
 
   useEffect(() => {
     const key = user?.email ? `profile_img_${user.email}` : 'profile_image';
@@ -276,27 +377,62 @@ case 'My Orders':
       case 'Address Book':
         return (
           <div className="space-y-5">
-            <div className="anim-fadeUp">
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">Address Book</h1>
-              <p className="text-sm text-gray-500">Manage your shipping addresses</p>
+            <div className="anim-fadeUp flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">Address Book</h1>
+                <p className="text-sm text-gray-500">Manage your shipping addresses</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleOpenAddAddress}
+                className="bg-[#A47A46] hover:bg-[#8e673e] text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-sm flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
+              >
+                <span>+ Add Address</span>
+              </button>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="anim-fadeUp delay-100 bg-gradient-to-br from-[#A47A46]/5 to-amber-50 p-5 sm:p-6 rounded-2xl border-2 border-[#A47A46]/30 relative">
-                <span className="absolute top-4 right-4 bg-[#A47A46] text-white text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full">
-                  Default
-                </span>
-                <h3 className="text-base font-semibold text-gray-900 mb-3">{profileData.firstName} {profileData.lastName}</h3>
-                <p className="text-sm text-gray-600 mb-1">{profileData.address}</p>
-                <p className="text-sm text-gray-600 mb-3">Kingston, 5236, United State</p>
-                <p className="text-sm text-gray-700 font-medium">{profileData.phone}</p>
-                <div className="flex gap-3 mt-5">
-                  <button className="px-4 py-2 text-[#A47A46] font-semibold text-sm hover:bg-[#A47A46]/10 rounded-lg transition-colors">Edit</button>
-                  <button className="px-4 py-2 text-gray-500 font-semibold text-sm hover:bg-gray-100 rounded-lg transition-colors">Delete</button>
+              {addresses.map((addr, idx) => (
+                <div
+                  key={addr._id || idx}
+                  className={`anim-fadeUp p-5 sm:p-6 rounded-2xl border-2 relative transition-all ${
+                    addr.isDefaultShipping
+                      ? 'bg-gradient-to-br from-[#A47A46]/5 to-amber-50 border-[#A47A46]/30 shadow-xs'
+                      : 'bg-white border-gray-100 shadow-xs hover:border-gray-200'
+                  }`}
+                >
+                  {addr.isDefaultShipping && (
+                    <span className="absolute top-4 right-4 bg-[#A47A46] text-white text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full">
+                      Default
+                    </span>
+                  )}
+                  <h3 className="text-base font-semibold text-gray-900 mb-2">{addr.name}</h3>
+                  <p className="text-sm text-gray-600 mb-1 font-medium">{addr.street}</p>
+                  <p className="text-sm text-gray-600 mb-2">{addr.city}, {addr.state} - {addr.zipCode}</p>
+                  <p className="text-sm text-gray-700 font-bold">📱 {addr.phone}</p>
+                  <div className="flex gap-3 mt-4 pt-3 border-t border-gray-100">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditAddress(addr)}
+                      className="px-3.5 py-1.5 text-[#A47A46] font-bold text-xs hover:bg-[#A47A46]/10 rounded-lg transition-colors cursor-pointer"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteAddress(addr._id)}
+                      className="px-3.5 py-1.5 text-rose-500 font-bold text-xs hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
-              </div>
+              ))}
 
-              <div className="anim-fadeUp delay-200 bg-white p-6 rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center text-center cursor-pointer hover:border-[#A47A46] hover:bg-[#A47A46]/5 transition-all min-h-[180px]">
+              <div
+                onClick={handleOpenAddAddress}
+                className="anim-fadeUp bg-white p-6 rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center text-center cursor-pointer hover:border-[#A47A46] hover:bg-[#A47A46]/5 transition-all min-h-[180px]"
+              >
                 <div className="w-11 h-11 rounded-full bg-gray-100 flex items-center justify-center mb-3">
                   <span className="text-xl font-bold text-gray-400">+</span>
                 </div>
@@ -307,47 +443,7 @@ case 'My Orders':
           </div>
         );
 
-      /* ─── Payment Methods ─────────────────────────────────────────────── */
-      case 'Payment Methods':
-        return (
-          <div className="space-y-5">
-            <div className="anim-fadeUp">
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">Payment Methods</h1>
-              <p className="text-sm text-gray-500">Manage your saved payment options</p>
-            </div>
-
-            <div className="space-y-4 max-w-sm sm:max-w-none">
-              {/* Card */}
-              <div className="anim-scaleIn delay-100 bg-gradient-to-br from-gray-800 to-gray-900 p-5 sm:p-6 rounded-2xl text-white relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-10 -mt-10 pointer-events-none" />
-                <div className="flex justify-between items-start mb-7">
-                  <CreditCard size={22} className="opacity-70" />
-                  <span className="bg-emerald-500/20 text-emerald-400 text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full">Default</span>
-                </div>
-                <p className="text-lg sm:text-xl tracking-widest font-medium mb-6">•••• •••• •••• 4242</p>
-                <div className="flex justify-between items-end">
-                  <div>
-                    <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">Card Holder</p>
-                    <p className="font-medium text-sm">{profileData.firstName} {profileData.lastName}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">Expires</p>
-                    <p className="font-medium text-sm">12/29</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Add new */}
-              <div className="anim-fadeUp delay-200 bg-white p-5 rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center text-center cursor-pointer hover:border-[#A47A46] hover:bg-[#A47A46]/5 transition-all">
-                <div className="w-11 h-11 rounded-full bg-gray-100 flex items-center justify-center mb-3">
-                  <span className="text-xl font-bold text-gray-400">+</span>
-                </div>
-                <h3 className="text-base font-semibold text-gray-900 mb-1">Add Payment Method</h3>
-                <p className="text-gray-400 text-sm">Credit or debit card</p>
-              </div>
-            </div>
-          </div>
-        );
+    
 
       default: return null;
     }
@@ -494,6 +590,138 @@ case 'My Orders':
 
         </div>
       </div>
+
+      {/* ── Add / Edit Address Modal ─────────────────────────────────────── */}
+      {isAddressModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl relative space-y-5 anim-scaleIn">
+            <div className="flex items-center justify-between border-b pb-3 border-gray-100">
+              <h3 className="text-lg font-bold text-gray-900">
+                {editingAddress ? 'Edit Address' : 'Add New Address'}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsAddressModalOpen(false)}
+                className="p-1 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveAddress} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Contact Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Keval Khunt"
+                  value={addressFormData.name}
+                  onChange={(e) => setAddressFormData({ ...addressFormData, name: e.target.value })}
+                  className={inputCls}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Phone Number *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. 9876543210"
+                  value={addressFormData.phone}
+                  onChange={(e) => setAddressFormData({ ...addressFormData, phone: e.target.value })}
+                  className={inputCls}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Street Address / House No. *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. 123 Main Street, Apt 4B"
+                  value={addressFormData.street}
+                  onChange={(e) => setAddressFormData({ ...addressFormData, street: e.target.value })}
+                  className={inputCls}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">City / Town *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Bengaluru"
+                    value={addressFormData.city}
+                    onChange={(e) => setAddressFormData({ ...addressFormData, city: e.target.value })}
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">State *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Karnataka"
+                    value={addressFormData.state}
+                    onChange={(e) => setAddressFormData({ ...addressFormData, state: e.target.value })}
+                    className={inputCls}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">ZIP / Postal Code *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. 560001"
+                    value={addressFormData.zipCode}
+                    onChange={(e) => setAddressFormData({ ...addressFormData, zipCode: e.target.value })}
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Country</label>
+                  <input
+                    type="text"
+                    value={addressFormData.country}
+                    onChange={(e) => setAddressFormData({ ...addressFormData, country: e.target.value })}
+                    className={inputCls}
+                  />
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2 pt-1 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={addressFormData.isDefaultShipping}
+                  onChange={(e) => setAddressFormData({ ...addressFormData, isDefaultShipping: e.target.checked })}
+                  className="w-4 h-4 text-[#A47A46] rounded-md focus:ring-[#A47A46]"
+                />
+                <span className="text-xs font-bold text-gray-700">Set as default shipping address</span>
+              </label>
+
+              <div className="flex gap-3 pt-4 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setIsAddressModalOpen(false)}
+                  className="flex-1 py-3 border border-gray-200 text-gray-600 font-bold text-xs rounded-xl hover:bg-gray-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-3 bg-[#A47A46] hover:bg-[#8e673e] text-white font-bold text-xs rounded-xl shadow-md cursor-pointer"
+                >
+                  {editingAddress ? 'Update Address' : 'Save Address'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </>
   );
 };

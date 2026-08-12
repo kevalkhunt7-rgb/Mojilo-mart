@@ -17,21 +17,15 @@ class ProductRepository extends BaseRepository {
     status,
     sort,
     skip = 0,
-    limit = 10
+    limit = 20
   }) {
     const query = {};
 
     if (status && status.toLowerCase() !== 'all') {
       query.status = status;
-    }
-
-    if (keyword) {
-      query.$or = [
-        { name: { $regex: keyword, $options: 'i' } },
-        { title: { $regex: keyword, $options: 'i' } },
-        { description: { $regex: keyword, $options: 'i' } },
-        { searchTags: { $regex: keyword, $options: 'i' } }
-      ];
+      query.isActive = true;
+    } else if (!status) {
+      query.isActive = true;
     }
 
     if (categoryId && categoryId.toLowerCase() !== 'all') {
@@ -62,29 +56,100 @@ class ProductRepository extends BaseRepository {
     if (sort === 'price-desc') sortObj = { basePrice: -1 };
     if (sort === 'rating') sortObj = { rating: -1 };
 
-    // Replaced 'brand' with 'category tags collections'
-    const products = await Product.find(query)
-      .populate('category tags collections')
-      .sort(sortObj)
-      .skip(skip)
-      .limit(limit);
+    const pageLimit = Math.min(100, Math.max(1, Number(limit) || 20));
 
-    const total = await Product.countDocuments(query);
+    // 1. Use MongoDB Atlas Search ($search aggregation) on index 'default' when keyword is present
+    if (keyword && keyword.trim() !== '') {
+      const searchKeyword = keyword.trim();
+      
+      const searchPipeline = [
+        {
+          $search: {
+            index: 'default',
+            text: {
+              query: searchKeyword,
+              path: { wildcard: '*' },
+              fuzzy: {
+                maxEdits: 1,
+                prefixLength: 1
+              }
+            }
+          }
+        }
+      ];
+
+      if (Object.keys(query).length > 0) {
+        searchPipeline.push({ $match: query });
+      }
+
+      const facetPipeline = [
+        ...searchPipeline,
+        {
+          $facet: {
+            products: [
+              { $sort: sortObj },
+              { $skip: Number(skip) },
+              { $limit: pageLimit },
+              { $project: { description: 0, sizeChart: 0 } }
+            ],
+            totalCount: [
+              { $count: 'count' }
+            ]
+          }
+        }
+      ];
+
+      try {
+        const aggregateResult = await Product.aggregate(facetPipeline);
+        const productsRaw = aggregateResult[0]?.products || [];
+        const total = aggregateResult[0]?.totalCount[0]?.count || 0;
+
+        const products = await Product.populate(productsRaw, [
+          { path: 'category', select: 'name slug' },
+          { path: 'tags', select: 'name' },
+          { path: 'collections', select: 'name' }
+        ]);
+
+        return { products, total };
+      } catch (err) {
+        console.warn('[Atlas Search Notice]: $search aggregation fallback triggered:', err.message);
+        // Fallback to text index / regex search if $search is not supported in local DB environment
+        query.$text = { $search: searchKeyword };
+      }
+    }
+
+    // 2. Default query execution for non-search catalog browsing or fallback
+    const [products, total] = await Promise.all([
+      Product.find(query)
+        .select('-description -sizeChart')
+        .populate('category', 'name slug')
+        .populate('tags', 'name')
+        .populate('collections', 'name')
+        .sort(sortObj)
+        .skip(Number(skip))
+        .limit(pageLimit)
+        .lean({ virtuals: true }),
+      Product.countDocuments(query)
+    ]);
 
     return { products, total };
   }
 
   async getFeaturedProducts(limit = 8) {
     return await Product.find({ featured: true, isActive: true })
-      .populate('category tags collections')
-      .limit(limit);
+      .select('-description -sizeChart')
+      .populate('category', 'name slug')
+      .limit(Number(limit))
+      .lean({ virtuals: true });
   }
 
   async getNewArrivals(limit = 8) {
     return await Product.find({ newArrival: true, isActive: true })
-      .populate('category tags collections')
+      .select('-description -sizeChart')
+      .populate('category', 'name slug')
       .sort({ createdAt: -1 })
-      .limit(limit);
+      .limit(Number(limit))
+      .lean({ virtuals: true });
   }
 }
 

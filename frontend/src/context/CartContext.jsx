@@ -115,10 +115,13 @@ export const CartProvider = ({ children }) => {
         frontPreview = bgCanvas.toDataURL("image/png");
       }
 
+      const computedUnitPrice = Math.round(((item.totalItemPrice || 0) / (item.quantity || 1)) * 100) / 100;
+
       return {
         ...item,
         isCustomTemplate: true,
-        price: item.totalItemPrice / (item.quantity || 1),
+        price: computedUnitPrice,
+        totalItemPrice: item.totalItemPrice,
         
         // 1. Snapshot image for standard 2D cart list & thumbnails
         image: frontPreview,
@@ -128,6 +131,8 @@ export const CartProvider = ({ children }) => {
           name: custObj.clothingType || item.clothingType || 'Custom Jersey',
           images: [{ url: frontPreview }],
           basePrice: item.virtualBasePrice,
+          calculatedPrice: computedUnitPrice,
+          price: computedUnitPrice,
         },
 
         // 3. ⚠️ CRITICAL FIX: Explicitly preserve customization object & previews for 3D Viewer & Order Checkout
@@ -241,14 +246,19 @@ export const CartProvider = ({ children }) => {
     let custData = customizationData;
     let colorVal = null;
     let sizeVal = null;
+    let priceVal = null;
 
     if (typeof productIdOrObject === 'object' && productIdOrObject !== null) {
       const itemObj = productIdOrObject;
       pId = itemObj._id || itemObj.id || itemObj.productId;
       vId = itemObj.variantId || (typeof itemObj.variant === 'object' ? itemObj.variant?._id : itemObj.variant) || null;
+      if (vId && typeof vId === 'string' && !/^[0-9a-fA-F]{24}$/.test(vId)) {
+        vId = null;
+      }
       qty = typeof variantId === 'number' ? variantId : (itemObj.quantity || 1);
       colorVal = typeof itemObj.selectedColor === 'object' ? (itemObj.selectedColor?.name || itemObj.selectedColor?.id) : (itemObj.selectedColor || itemObj.color || null);
       sizeVal = itemObj.selectedSize || itemObj.size || null;
+      priceVal = itemObj.price !== undefined && itemObj.price !== null ? Number(itemObj.price) : null;
     } else {
       pId = productIdOrObject;
       vId = typeof variantId === 'string' ? variantId : null;
@@ -267,6 +277,7 @@ export const CartProvider = ({ children }) => {
       if (vId) payload.variantId = String(vId);
       if (colorVal) payload.color = String(colorVal);
       if (sizeVal) payload.size = String(sizeVal);
+      if (priceVal !== null && !isNaN(priceVal) && priceVal > 0) payload.price = priceVal;
       if (custData) payload.customizationData = custData;
 
       const response = await api.post('/cart', payload);

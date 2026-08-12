@@ -1,6 +1,6 @@
 import React from 'react'
 import { Toaster } from 'react-hot-toast'
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Outlet } from 'react-router-dom'
 import Home from './pages/Home'
 import Login from './pages/Login'
 import NewOffers from './pages/NewOffers'
@@ -15,6 +15,7 @@ import Profile from './pages/Profile'
 import Wishlist from './pages/Wishlist'
 import Cart from './pages/Cart'
 import CheckOut from './pages/CheckOut'
+import OrderDetail from './pages/OrderDetail'
 import NotFound from './pages/NotFound'
 import CoustomProductTshirt from './pages/CoustomProductTshirt'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -29,6 +30,18 @@ import { CanvasProvider } from './context/CanvasContext'
 // Redux Imports
 import { Provider } from 'react-redux'
 import { store } from './store' 
+
+// Main layout that includes Navbar and Footer
+const MainLayout = () => {
+  return (
+    <>
+      <Navbar />
+      <ScrollToTop />
+      <Outlet /> {/* Child routes render here */}
+      <Footer />
+    </>
+  )
+}
 
 const App = () => {
   return (
@@ -62,29 +75,35 @@ const App = () => {
               <OrdersProvider> 
                 <CanvasProvider>
                   
-                  <Navbar />
-                  <ScrollToTop />
-                  
                   <Routes>
-                    <Route path="/" element={<Home />} />
-                    <Route path="/login" element={<Login />} />
-                    <Route path="/new-offers" element={<NewOffers />} />
-                    <Route path="/collection" element={<Collection />} />
-                    <Route path="/contact-us" element={<ContactUs />} />
-                    <Route path="/custom" element={<Custom />} />
-                    <Route path="/product-details/:id" element={<ProductDetails />} />
-                    <Route path="/my-profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} /> 
-                    <Route path="/my-wishlist" element={<Wishlist />} />
-                    <Route path="/cart" element={<Cart />} />
-                    <Route path="/checkout" element={<CheckOut />} />
-                    
-                   
-                    <Route path="/coustom-product-tshirt/:apparelId" element={<CoustomProductTshirt/>}/>
-                    
-                    <Route path="/*" element={<NotFound />} />
+                    {/* Routes with Navbar & Footer */}
+                    <Route element={<MainLayout />}>
+                      <Route path="/" element={<Home />} />
+                      <Route path="/login" element={<Login />} />
+                      <Route path="/new-offers" element={<NewOffers />} />
+                      <Route path="/collection" element={<Collection />} />
+                      <Route path="/contact-us" element={<ContactUs />} />
+                      <Route path="/custom" element={<Custom />} />
+                      <Route path="/product-details/:id" element={<ProductDetails />} />
+                      <Route path="/my-profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} /> 
+                      <Route path="/order/:id" element={<ProtectedRoute><OrderDetail /></ProtectedRoute>} />
+                      <Route path="/my-wishlist" element={<Wishlist />} />
+                      <Route path="/cart" element={<Cart />} />
+                      <Route path="/checkout" element={<CheckOut />} />
+                      <Route path="/*" element={<NotFound />} />
+                    </Route>
+
+                    {/* Route WITHOUT Navbar & Footer */}
+                    <Route 
+                      path="/coustom-product-tshirt/:apparelId" 
+                      element={
+                        <>
+                          <ScrollToTop />
+                          <CoustomProductTshirt />
+                        </>
+                      } 
+                    />
                   </Routes>
-                  
-                  <Footer />
 
                 </CanvasProvider>
               </OrdersProvider> 

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../lib/axios';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { ArrowLeft, FolderPlus, UploadCloud, X, Image as ImageIcon } from 'lucide-react';
@@ -22,9 +22,7 @@ export default function EditCategory() {
     try {
       setLoading(true);
 
-      const res = await axios.get('/api/categories', {
-        withCredentials: true,
-      });
+      const res = await api.get('/categories');
 
       const category = (res.data?.data || []).find(
         (item) => item._id === id
@@ -115,14 +113,11 @@ export default function EditCategory() {
     }
 
     // Send standard JSON object matching express.json()
-    await axios.patch(
-      `/api/categories/${id}`,
+    await api.patch(
+      `/categories/${id}`,
       {
         name: name.trim(),
         image: imagePayload,
-      },
-      {
-        withCredentials: true,
       }
     );
 

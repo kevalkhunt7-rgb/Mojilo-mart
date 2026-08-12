@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import axios from 'axios';
+import api from '../lib/axios';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { ArrowLeft, Image, Type, Link, BarChart3, Tag } from 'lucide-react';
@@ -31,7 +31,7 @@ export default function EditBanner() {
     const fetchBannerDetails = async () => {
       try {
         setFetching(true);
-        const response = await axios.get(`/api/banners`, { withCredentials: true });
+        const response = await api.get('/banners');
         // Extract array wrappers safely and find the targeted slide match
         const allBanners = response.data.data || response.data;
         const currentBanner = allBanners.find(b => b._id === id);
@@ -106,9 +106,8 @@ export default function EditBanner() {
 
     try {
       setLoading(true);
-      await axios.patch(`/api/banners/${id}`, data, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        withCredentials: true
+      await api.patch(`/banners/${id}`, data, {
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
       toast.success('Hero slider banner layout changes saved successfully!');
       setTimeout(() => navigate('/banners'), 1500);

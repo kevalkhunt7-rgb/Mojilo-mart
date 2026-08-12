@@ -8,7 +8,9 @@
     "start": "cross-env NODE_OPTIONS=--dns-result-order=ipv4first node server.js",
     "dev": "cross-env NODE_OPTIONS=--dns-result-order=ipv4first nodemon server.js",
     "seed:admin": "cross-env NODE_OPTIONS=--dns-result-order=ipv4first node seeder.js",
-    "check:users": "cross-env NODE_OPTIONS=--dns-result-order=ipv4first node checkUsers.js"
+    "check:users": "cross-env NODE_OPTIONS=--dns-result-order=ipv4first node checkUsers.js",
+    "sync:indexes": "cross-env NODE_OPTIONS=--dns-result-order=ipv4first node scripts/syncIndexes.js",
+    "migrate:category-images": "cross-env NODE_OPTIONS=--dns-result-order=ipv4first node scripts/migrateCategoryImages.js"
   },
   "keywords": [
     "ecommerce",
@@ -35,6 +37,7 @@
     "express-mongo-sanitize": "^2.2.0",
     "express-rate-limit": "^7.1.5",
     "express-validator": "^7.3.2",
+    "google-auth-library": "^11.0.0",
     "helmet": "^7.0.0",
     "ioredis": "^5.11.1",
     "jsonwebtoken": "^9.0.2",

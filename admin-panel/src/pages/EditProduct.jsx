@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../lib/axios';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import {
@@ -68,10 +68,10 @@ export default function EditProduct() {
     setLoading(true);
     try {
       const [productRes, catRes, tagsRes, collectionsRes] = await Promise.all([
-        axios.get(`/api/products/id/${id}`, { withCredentials: true }),
-        axios.get('/api/categories', { withCredentials: true }),
-        axios.get('/api/products/tags', { withCredentials: true }).catch(() => ({ data: { data: [] } })),
-        axios.get('/api/products/collections', { withCredentials: true }).catch(() => ({ data: { data: [] } }))
+        api.get(`/products/id/${id}`),
+        api.get('/categories'),
+        api.get('/products/tags').catch(() => ({ data: { data: [] } })),
+        api.get('/products/collections').catch(() => ({ data: { data: [] } }))
       ]);
 
       const product = productRes.data?.data;
@@ -107,7 +107,14 @@ export default function EditProduct() {
         tags: Array.isArray(product.tags) ? product.tags.map(t => typeof t === 'object' ? t._id : t) : [],
         collections: Array.isArray(product.collections) ? product.collections.map(c => typeof c === 'object' ? c._id : c) : [],
         colors: Array.isArray(product.colors) ? product.colors : [],
-        sizes: Array.isArray(product.sizes) ? product.sizes : []
+        sizes: Array.isArray(product.sizes)
+          ? product.sizes.map((s) => {
+              if (typeof s === 'object' && s !== null) {
+                return { size: s.size || '', price: s.price !== undefined && s.price !== null ? String(s.price) : '' };
+              }
+              return { size: String(s), price: '' };
+            })
+          : []
       });
 
       setExistingImages(product.images || []);
@@ -204,19 +211,35 @@ export default function EditProduct() {
 
   // Size Handlers
   const toggleSize = (sizeVal) => {
-    if (formData.sizes.includes(sizeVal)) {
-      setFormData(prev => ({ ...prev, sizes: prev.sizes.filter(s => s !== sizeVal) }));
-    } else {
-      setFormData(prev => ({ ...prev, sizes: [...prev.sizes, sizeVal] }));
-    }
+    setFormData((prev) => {
+      const exists = prev.sizes.some((s) => (typeof s === 'object' ? s.size : s) === sizeVal);
+      if (exists) {
+        return { ...prev, sizes: prev.sizes.filter((s) => (typeof s === 'object' ? s.size : s) !== sizeVal) };
+      } else {
+        return { ...prev, sizes: [...prev.sizes, { size: sizeVal, price: '' }] };
+      }
+    });
   };
 
   const handleAddCustomSize = () => {
     const trimmed = customSizeInput.trim().toUpperCase();
-    if (trimmed && !formData.sizes.includes(trimmed)) {
-      setFormData(prev => ({ ...prev, sizes: [...prev.sizes, trimmed] }));
+    if (trimmed && !formData.sizes.some((s) => (typeof s === 'object' ? s.size : s) === trimmed)) {
+      setFormData((prev) => ({ ...prev, sizes: [...prev.sizes, { size: trimmed, price: '' }] }));
       setCustomSizeInput('');
     }
+  };
+
+  const updateSizePrice = (sizeVal, priceVal) => {
+    setFormData((prev) => ({
+      ...prev,
+      sizes: prev.sizes.map((s) => {
+        const name = typeof s === 'object' ? s.size : s;
+        if (name === sizeVal) {
+          return { size: sizeVal, price: priceVal };
+        }
+        return typeof s === 'object' ? s : { size: s, price: '' };
+      }),
+    }));
   };
 
   // Tag & Collection Toggles
@@ -271,7 +294,6 @@ export default function EditProduct() {
     data.append('featured', String(formData.featured));
     data.append('isActive', String(formData.isActive));
 
-    // Append JSON formatted fields
     data.append('existingImages', JSON.stringify(existingImages));
 
     const searchTagsArr = formData.searchTags
@@ -284,23 +306,20 @@ export default function EditProduct() {
     data.append('colors', JSON.stringify(formData.colors));
     data.append('sizes', JSON.stringify(formData.sizes));
 
-    // Append Size Chart URL/File
     if (selectedSizeChart) {
       data.append('sizeChart', selectedSizeChart);
     } else if (!existingSizeChart) {
       data.append('sizeChart', '');
     }
 
-    // Append New Image Files
     selectedImages.forEach(file => {
       data.append('images', file);
     });
 
     setSubmitting(true);
     try {
-      await axios.patch(`/api/products/${id}`, data, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        withCredentials: true
+      await api.patch(`/products/${id}`, data, {
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
 
       toast.success('Product updated successfully!');
@@ -315,7 +334,7 @@ export default function EditProduct() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3 text-slate-500">
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3 text-slate-500 dark:text-slate-400">
         <Loader2 className="animate-spin text-indigo-600" size={36} />
         <p className="text-sm font-semibold">Loading product details...</p>
       </div>
@@ -326,23 +345,23 @@ export default function EditProduct() {
   const totalImagesCount = existingImages.length + selectedImages.length;
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 pb-12">
+    <div className="max-w-7xl mx-auto space-y-6 pb-12 transition-colors duration-200">
       <ToastContainer position="top-right" autoClose={3000} />
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-[#e2e8f0] shadow-sm">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-[#e2e8f0] dark:border-slate-800 shadow-sm">
         <div className="flex items-center gap-4">
           <button
             type="button"
             onClick={() => navigate('/products')}
-            className="p-2.5 hover:bg-slate-100 rounded-xl text-slate-500 transition-colors border border-slate-200"
+            className="p-2.5 rounded-xl transition-colors border bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
             title="Back to Products"
           >
             <ArrowLeft size={18} />
           </button>
           <div>
-            <h1 className="text-xl font-bold text-slate-800">Edit Product</h1>
-            <p className="text-xs text-slate-500 font-medium">Update specifications and catalog preferences for {formData.name || 'Product'}</p>
+            <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">Edit Product</h1>
+            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Update specifications and catalog preferences for {formData.name || 'Product'}</p>
           </div>
         </div>
 
@@ -350,7 +369,7 @@ export default function EditProduct() {
           <button
             type="button"
             onClick={() => navigate('/products')}
-            className="flex-1 sm:flex-none px-4 py-2.5 border border-slate-200 text-slate-600 text-xs font-bold rounded-xl hover:bg-slate-50 transition-colors"
+            className="flex-1 sm:flex-none px-4 py-2.5 border text-xs font-bold rounded-xl transition-colors border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
           >
             Cancel
           </button>
@@ -373,14 +392,14 @@ export default function EditProduct() {
         <div className="lg:col-span-2 space-y-6">
 
           {/* Basic Specifications */}
-          <div className="bg-white p-6 rounded-2xl border border-[#e2e8f0] shadow-sm space-y-5">
-            <h3 className="font-bold text-slate-800 text-sm border-b pb-3 border-slate-100 flex items-center gap-2">
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-[#e2e8f0] dark:border-slate-800 shadow-sm space-y-5">
+            <h3 className="font-bold text-slate-800 dark:text-slate-200 text-sm border-b pb-3 border-slate-100 dark:border-slate-800 flex items-center gap-2">
               <ShoppingBag size={16} className="text-indigo-600" /> Basic Product Details
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5 md:col-span-2">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                   Product Name <span className="text-rose-500">*</span>
                 </label>
                 <input
@@ -389,86 +408,86 @@ export default function EditProduct() {
                   placeholder="e.g. Classic Heavyweight Oversized Tee"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:border-indigo-500 outline-none transition-all"
+                  className="w-full bg-[#f8fafc] dark:bg-slate-800 border border-[#e2e8f0] dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 outline-none transition-all"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">SKU Code</label>
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">SKU Code</label>
                 <input
                   type="text"
                   placeholder="e.g. TEE-BLK-001"
                   value={formData.sku}
                   onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                  className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:border-indigo-500 outline-none transition-all"
+                  className="w-full bg-[#f8fafc] dark:bg-slate-800 border border-[#e2e8f0] dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 outline-none transition-all"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Custom Slug (Optional)</label>
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Custom Slug (Optional)</label>
                 <input
                   type="text"
                   placeholder="e.g. classic-heavyweight-oversized-tee"
                   value={formData.slug}
                   onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                  className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:border-indigo-500 outline-none transition-all"
+                  className="w-full bg-[#f8fafc] dark:bg-slate-800 border border-[#e2e8f0] dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 outline-none transition-all"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                   Category <span className="text-rose-500">*</span>
                 </label>
                 <select
                   value={formData.category}
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:border-indigo-500 outline-none transition-all"
+                  className="w-full bg-[#f8fafc] dark:bg-slate-800 border border-[#e2e8f0] dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 outline-none transition-all"
                 >
                   {categories.map((cat) => (
-                    <option key={cat._id} value={cat._id}>{cat.name}</option>
+                    <option key={cat._id} value={cat._id} className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100">{cat.name}</option>
                   ))}
                 </select>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Target Gender</label>
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Target Gender</label>
                 <select
                   value={formData.gender}
                   onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                  className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:border-indigo-500 outline-none transition-all"
+                  className="w-full bg-[#f8fafc] dark:bg-slate-800 border border-[#e2e8f0] dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 outline-none transition-all"
                 >
-                  <option value="Unisex">Unisex</option>
-                  <option value="Men">Men</option>
-                  <option value="Women">Women</option>
+                  <option value="Unisex" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100">Unisex</option>
+                  <option value="Men" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100">Men</option>
+                  <option value="Women" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100">Women</option>
                 </select>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Product Status</label>
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Product Status</label>
                 <select
                   value={formData.status}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                  className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:border-indigo-500 outline-none transition-all"
+                  className="w-full bg-[#f8fafc] dark:bg-slate-800 border border-[#e2e8f0] dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 outline-none transition-all"
                 >
-                  <option value="Draft">Draft</option>
-                  <option value="Published">Published</option>
+                  <option value="Draft" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100">Draft</option>
+                  <option value="Published" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100">Published</option>
                 </select>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Material / Fabric</label>
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Material / Fabric</label>
                 <input
                   type="text"
                   placeholder="e.g. 100% Combed Cotton, 240 GSM"
                   value={formData.material}
                   onChange={(e) => setFormData({ ...formData, material: e.target.value })}
-                  className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:border-indigo-500 outline-none transition-all"
+                  className="w-full bg-[#f8fafc] dark:bg-slate-800 border border-[#e2e8f0] dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 outline-none transition-all"
                 />
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                 Product Description <span className="text-rose-500">*</span>
               </label>
               <textarea
@@ -477,20 +496,20 @@ export default function EditProduct() {
                 placeholder="Write detailed bullet points, fit quality, care instructions..."
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:border-indigo-500 outline-none transition-all"
+                className="w-full bg-[#f8fafc] dark:bg-slate-800 border border-[#e2e8f0] dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 outline-none transition-all"
               />
             </div>
           </div>
 
           {/* Pricing Card */}
-          <div className="bg-white p-6 rounded-2xl border border-[#e2e8f0] shadow-sm space-y-4">
-            <h3 className="font-bold text-slate-800 text-sm border-b pb-3 border-slate-100 flex items-center gap-2">
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-[#e2e8f0] dark:border-slate-800 shadow-sm space-y-4">
+            <h3 className="font-bold text-slate-800 dark:text-slate-200 text-sm border-b pb-3 border-slate-100 dark:border-slate-800 flex items-center gap-2">
               <Info size={16} className="text-indigo-600" /> Pricing Information
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                   Base Price (₹) <span className="text-rose-500">*</span>
                 </label>
                 <input
@@ -500,12 +519,12 @@ export default function EditProduct() {
                   placeholder="e.g. 799"
                   value={formData.basePrice}
                   onChange={(e) => setFormData({ ...formData, basePrice: e.target.value })}
-                  className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:border-indigo-500 outline-none transition-all"
+                  className="w-full bg-[#f8fafc] dark:bg-slate-800 border border-[#e2e8f0] dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 outline-none transition-all"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                   Sale Price (₹) <span className="text-slate-400 font-normal">(Optional)</span>
                 </label>
                 <input
@@ -514,27 +533,27 @@ export default function EditProduct() {
                   placeholder="e.g. 599"
                   value={formData.salePrice}
                   onChange={(e) => setFormData({ ...formData, salePrice: e.target.value })}
-                  className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:border-indigo-500 outline-none transition-all"
+                  className="w-full bg-[#f8fafc] dark:bg-slate-800 border border-[#e2e8f0] dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 outline-none transition-all"
                 />
               </div>
             </div>
           </div>
 
           {/* Colors & Sizes Card */}
-          <div className="bg-white p-6 rounded-2xl border border-[#e2e8f0] shadow-sm space-y-5">
-            <h3 className="font-bold text-slate-800 text-sm border-b pb-3 border-slate-100 flex items-center gap-2">
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-[#e2e8f0] dark:border-slate-800 shadow-sm space-y-5">
+            <h3 className="font-bold text-slate-800 dark:text-slate-200 text-sm border-b pb-3 border-slate-100 dark:border-slate-800 flex items-center gap-2">
               <Sparkles size={16} className="text-indigo-600" /> Product Attributes (Colors & Sizes)
             </h3>
 
             {/* Colors */}
             <div className="space-y-3">
-              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Available Colors</label>
-              <div className="flex flex-wrap items-center gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block">Available Colors</label>
+              <div className="flex flex-wrap items-center gap-3 bg-slate-50 dark:bg-slate-800/50 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700">
                 <input
                   type="color"
                   value={tempColor}
                   onChange={(e) => setTempColor(e.target.value)}
-                  className="w-9 h-9 rounded-lg border border-slate-300 cursor-pointer p-0.5"
+                  className="w-9 h-9 rounded-lg border border-slate-300 dark:border-slate-600 cursor-pointer p-0.5"
                   title="Pick a color hex"
                 />
                 <input
@@ -542,7 +561,7 @@ export default function EditProduct() {
                   placeholder="Color name or Hex code (e.g. Black / #000000)"
                   value={customColorName}
                   onChange={(e) => setCustomColorName(e.target.value)}
-                  className="flex-1 min-w-[200px] bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-indigo-500"
+                  className="flex-1 min-w-[200px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs font-medium text-slate-800 dark:text-slate-100 outline-none focus:border-indigo-500"
                 />
                 <button
                   type="button"
@@ -558,10 +577,10 @@ export default function EditProduct() {
                   {formData.colors.map((color) => {
                     const isHex = color.startsWith('#');
                     return (
-                      <div key={color} className="flex items-center gap-1.5 bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-800">
+                      <div key={color} className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-200">
                         {isHex && (
                           <span
-                            className="w-3.5 h-3.5 rounded-full border border-slate-300 inline-block"
+                            className="w-3.5 h-3.5 rounded-full border border-slate-300 dark:border-slate-600 inline-block"
                             style={{ backgroundColor: color }}
                           />
                         )}
@@ -581,12 +600,17 @@ export default function EditProduct() {
             </div>
 
             {/* Sizes */}
-            <div className="space-y-3 pt-2">
-              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Available Sizes</label>
+            <div className="space-y-4 pt-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <label className="text-xs font-bold uppercase tracking-wider block text-slate-700 dark:text-slate-300">Available Sizes & Custom Prices</label>
+                <span className="text-[11px] font-medium text-slate-400">
+                  Default: ₹{formData.salePrice || formData.basePrice || 0}
+                </span>
+              </div>
               
               <div className="flex flex-wrap gap-2">
                 {standardSizes.map((sz) => {
-                  const isSelected = formData.sizes.includes(sz);
+                  const isSelected = formData.sizes.some((s) => (typeof s === 'object' ? s.size : s) === sz);
                   return (
                     <button
                       key={sz}
@@ -595,7 +619,7 @@ export default function EditProduct() {
                       className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-all ${
                         isSelected
                           ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
-                          : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                          : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
                       }`}
                     >
                       {sz}
@@ -610,29 +634,80 @@ export default function EditProduct() {
                   placeholder="Custom Size (e.g. 40, Free Size)"
                   value={customSizeInput}
                   onChange={(e) => setCustomSizeInput(e.target.value)}
-                  className="flex-1 bg-[#f8fafc] border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-medium outline-none focus:bg-white focus:border-indigo-500"
+                  className="flex-1 rounded-xl px-3 py-1.5 text-xs font-medium border outline-none focus:border-indigo-500 bg-[#f8fafc] dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100"
                 />
                 <button
                   type="button"
                   onClick={handleAddCustomSize}
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl transition-all"
+                  className="px-3 py-1.5 text-xs font-bold rounded-xl transition-all bg-slate-800 dark:bg-slate-700 hover:bg-slate-900 dark:hover:bg-slate-600 text-white"
                 >
                   Add
                 </button>
               </div>
+
+              {/* Active Sizes & Custom Price Inputs */}
+              {formData.sizes.length > 0 && (
+                <div className="space-y-2.5 pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Custom Size Pricing (Leave blank to use sale/base price)
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                    {formData.sizes.map((sObj) => {
+                      const szName = typeof sObj === 'object' ? sObj.size : sObj;
+                      const szPrice = typeof sObj === 'object' ? (sObj.price ?? '') : '';
+                      const defaultPrice = formData.salePrice || formData.basePrice || 0;
+
+                      return (
+                        <div
+                          key={szName}
+                          className="flex items-center justify-between p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 gap-2"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="w-7 h-7 rounded-lg bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-300 font-bold text-xs flex items-center justify-center shrink-0">
+                              {szName}
+                            </span>
+                            <span className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">
+                              Size {szName}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5 w-32 shrink-0">
+                            <span className="text-xs font-bold text-slate-400">₹</span>
+                            <input
+                              type="number"
+                              min="0"
+                              placeholder={`Default: ₹${defaultPrice}`}
+                              value={szPrice}
+                              onChange={(e) => updateSizePrice(szName, e.target.value)}
+                              className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-xs font-bold outline-none focus:border-indigo-500 text-slate-800 dark:text-slate-100 placeholder:font-normal placeholder:text-slate-400"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => toggleSize(szName)}
+                              className="text-slate-400 hover:text-rose-500 p-1"
+                              title="Remove size"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Tags & Collections */}
-          <div className="bg-white p-6 rounded-2xl border border-[#e2e8f0] shadow-sm space-y-5">
-            <h3 className="font-bold text-slate-800 text-sm border-b pb-3 border-slate-100 flex items-center gap-2">
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-[#e2e8f0] dark:border-slate-800 shadow-sm space-y-5">
+            <h3 className="font-bold text-slate-800 dark:text-slate-200 text-sm border-b pb-3 border-slate-100 dark:border-slate-800 flex items-center gap-2">
               <Tag size={16} className="text-indigo-600" /> Tags, Collections & Search Index
             </h3>
 
             {/* Tags */}
             {availableTags.length > 0 && (
               <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Select Tags</label>
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block">Select Tags</label>
                 <div className="flex flex-wrap gap-2">
                   {availableTags.map((t) => {
                     const isSelected = formData.tags.includes(t._id);
@@ -643,8 +718,8 @@ export default function EditProduct() {
                         onClick={() => toggleTag(t._id)}
                         className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all flex items-center gap-1.5 ${
                           isSelected
-                            ? 'bg-indigo-50 border-indigo-200 text-indigo-700 font-bold'
-                            : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                            ? 'bg-indigo-50 dark:bg-indigo-950/60 border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 font-bold'
+                            : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
                         }`}
                       >
                         {isSelected && <Check size={12} />}
@@ -659,7 +734,7 @@ export default function EditProduct() {
             {/* Collections */}
             {availableCollections.length > 0 && (
               <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Assign to Collections</label>
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block">Assign to Collections</label>
                 <div className="flex flex-wrap gap-2">
                   {availableCollections.map((c) => {
                     const isSelected = formData.collections.includes(c._id);
@@ -670,8 +745,8 @@ export default function EditProduct() {
                         onClick={() => toggleCollection(c._id)}
                         className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all flex items-center gap-1.5 ${
                           isSelected
-                            ? 'bg-emerald-50 border-emerald-200 text-emerald-700 font-bold'
-                            : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                            ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 font-bold'
+                            : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
                         }`}
                       >
                         {isSelected && <Check size={12} />}
@@ -685,13 +760,13 @@ export default function EditProduct() {
 
             {/* Search Tags */}
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Search Keywords / Search Tags</label>
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Search Keywords / Search Tags</label>
               <input
                 type="text"
                 placeholder="Comma separated keywords e.g. tshirt, cotton, oversized, summer"
                 value={formData.searchTags}
                 onChange={(e) => setFormData({ ...formData, searchTags: e.target.value })}
-                className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:border-indigo-500 outline-none transition-all"
+                className="w-full bg-[#f8fafc] dark:bg-slate-800 border border-[#e2e8f0] dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 outline-none transition-all"
               />
               <p className="text-[11px] text-slate-400 font-medium">Improves internal search relevance for customers</p>
             </div>
@@ -703,14 +778,14 @@ export default function EditProduct() {
         <div className="space-y-6">
 
           {/* Visibility Badges Card */}
-          <div className="bg-white p-6 rounded-2xl border border-[#e2e8f0] shadow-sm space-y-4">
-            <h3 className="font-bold text-slate-800 text-sm border-b pb-3 border-slate-100">Visibility & Status</h3>
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-[#e2e8f0] dark:border-slate-800 shadow-sm space-y-4">
+            <h3 className="font-bold text-slate-800 dark:text-slate-200 text-sm border-b pb-3 border-slate-100 dark:border-slate-800">Visibility & Status</h3>
 
             <div className="space-y-3">
-              <label className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100/70 transition-colors">
+              <label className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer hover:bg-slate-100/70 dark:hover:bg-slate-800 transition-colors">
                 <div>
-                  <p className="text-xs font-bold text-slate-800">Active Status</p>
-                  <p className="text-[11px] text-slate-500 font-medium">Visible to customers in store</p>
+                  <p className="text-xs font-bold text-slate-800 dark:text-slate-100">Active Status</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Visible to customers in store</p>
                 </div>
                 <input
                   type="checkbox"
@@ -720,10 +795,10 @@ export default function EditProduct() {
                 />
               </label>
 
-              <label className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100/70 transition-colors">
+              <label className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer hover:bg-slate-100/70 dark:hover:bg-slate-800 transition-colors">
                 <div>
-                  <p className="text-xs font-bold text-slate-800">New Arrival</p>
-                  <p className="text-[11px] text-slate-500 font-medium">Mark product with New badge</p>
+                  <p className="text-xs font-bold text-slate-800 dark:text-slate-100">New Arrival</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Mark product with New badge</p>
                 </div>
                 <input
                   type="checkbox"
@@ -733,10 +808,10 @@ export default function EditProduct() {
                 />
               </label>
 
-              <label className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100/70 transition-colors">
+              <label className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer hover:bg-slate-100/70 dark:hover:bg-slate-800 transition-colors">
                 <div>
-                  <p className="text-xs font-bold text-slate-800">Featured Product</p>
-                  <p className="text-[11px] text-slate-500 font-medium">Highlight on homepage & featured lists</p>
+                  <p className="text-xs font-bold text-slate-800 dark:text-slate-100">Featured Product</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Highlight on homepage & featured lists</p>
                 </div>
                 <input
                   type="checkbox"
@@ -749,16 +824,16 @@ export default function EditProduct() {
           </div>
 
           {/* Product Images Card */}
-          <div className="bg-white p-6 rounded-2xl border border-[#e2e8f0] shadow-sm space-y-4">
-            <div className="flex justify-between items-center border-b pb-3 border-slate-100">
-              <h3 className="font-bold text-slate-800 text-sm">Product Gallery</h3>
-              <span className="text-xs text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded-md">
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-[#e2e8f0] dark:border-slate-800 shadow-sm space-y-4">
+            <div className="flex justify-between items-center border-b pb-3 border-slate-100 dark:border-slate-800">
+              <h3 className="font-bold text-slate-800 dark:text-slate-100 text-sm">Product Gallery</h3>
+              <span className="text-xs text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-md">
                 {totalImagesCount} / 5
               </span>
             </div>
 
             {totalImagesCount < 5 ? (
-              <div className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-2xl p-6 bg-slate-50 cursor-pointer hover:bg-indigo-50/50 hover:border-indigo-300 transition-colors relative group">
+              <div className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 rounded-2xl p-6 cursor-pointer hover:bg-indigo-50/50 dark:hover:bg-slate-800 hover:border-indigo-300 dark:hover:border-indigo-500 transition-colors relative group">
                 <input
                   type="file"
                   multiple
@@ -767,11 +842,11 @@ export default function EditProduct() {
                   className="absolute inset-0 opacity-0 cursor-pointer"
                 />
                 <Upload className="text-slate-400 group-hover:text-indigo-600 mb-2 transition-colors" size={24} />
-                <p className="text-xs text-slate-600 font-bold">Upload Product Images</p>
+                <p className="text-xs text-slate-600 dark:text-slate-300 font-bold">Upload Product Images</p>
                 <p className="text-[10px] text-slate-400 mt-0.5">JPEG, PNG or WEBP (Max 5 images)</p>
               </div>
             ) : (
-              <div className="text-center p-3 border border-dashed border-amber-200 bg-amber-50 rounded-xl text-xs text-amber-700 font-medium">
+              <div className="text-center p-3 border border-dashed border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30 rounded-xl text-xs text-amber-700 dark:text-amber-400 font-medium">
                 Maximum limit of 5 images reached.
               </div>
             )}
@@ -779,10 +854,10 @@ export default function EditProduct() {
             {/* Existing Images */}
             {existingImages.length > 0 && (
               <div className="space-y-1.5 pt-1">
-                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Current Images</p>
+                <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Current Images</p>
                 <div className="grid grid-cols-3 gap-2.5">
                   {existingImages.map((img, idx) => (
-                    <div key={img._id || idx} className="aspect-square bg-slate-50 rounded-xl border border-slate-200 overflow-hidden relative shadow-sm group">
+                    <div key={img._id || idx} className="aspect-square bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden relative shadow-sm group">
                       <img src={img.url || img} alt="Existing product image" className="w-full h-full object-cover" />
                       <button
                         type="button"
@@ -801,10 +876,10 @@ export default function EditProduct() {
             {/* Newly Selected Image Previews */}
             {imagePreviews.length > 0 && (
               <div className="space-y-1.5 pt-1">
-                <p className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider">New Uploads</p>
+                <p className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">New Uploads</p>
                 <div className="grid grid-cols-3 gap-2.5">
                   {imagePreviews.map((src, idx) => (
-                    <div key={idx} className="aspect-square bg-slate-50 rounded-xl border border-indigo-200 overflow-hidden relative shadow-sm group">
+                    <div key={idx} className="aspect-square bg-slate-50 dark:bg-slate-800 rounded-xl border border-indigo-200 dark:border-indigo-800 overflow-hidden relative shadow-sm group">
                       <img src={src} alt="New upload preview" className="w-full h-full object-cover" />
                       <button
                         type="button"
@@ -822,15 +897,15 @@ export default function EditProduct() {
           </div>
 
           {/* Size Chart Upload Card */}
-          <div className="bg-white p-6 rounded-2xl border border-[#e2e8f0] shadow-sm space-y-4">
-            <h3 className="font-bold text-slate-800 text-sm border-b pb-3 border-slate-100 flex items-center gap-2">
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-[#e2e8f0] dark:border-slate-800 shadow-sm space-y-4">
+            <h3 className="font-bold text-slate-800 dark:text-slate-200 text-sm border-b pb-3 border-slate-100 dark:border-slate-800 flex items-center gap-2">
               <FileText size={16} className="text-indigo-600" /> Size Chart Guide
             </h3>
 
             {sizeChartPreview ? (
               <div className="space-y-2">
-                <p className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider">New Size Chart Selected</p>
-                <div className="relative border border-indigo-200 rounded-xl overflow-hidden bg-slate-50 max-h-48 flex items-center justify-center">
+                <p className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">New Size Chart Selected</p>
+                <div className="relative border border-indigo-200 dark:border-indigo-800 rounded-xl overflow-hidden bg-slate-50 dark:bg-slate-800 max-h-48 flex items-center justify-center">
                   <img src={sizeChartPreview} alt="Size Chart Preview" className="max-h-48 object-contain" />
                   <button
                     type="button"
@@ -844,8 +919,8 @@ export default function EditProduct() {
               </div>
             ) : existingSizeChart ? (
               <div className="space-y-2">
-                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Current Size Chart</p>
-                <div className="relative border border-slate-200 rounded-xl overflow-hidden bg-slate-50 max-h-48 flex items-center justify-center">
+                <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Current Size Chart</p>
+                <div className="relative border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden bg-slate-50 dark:bg-slate-800 max-h-48 flex items-center justify-center">
                   <img src={existingSizeChart} alt="Current Size Chart" className="max-h-48 object-contain" />
                   <button
                     type="button"
@@ -858,7 +933,7 @@ export default function EditProduct() {
                 </div>
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-2xl p-5 bg-slate-50 cursor-pointer hover:bg-indigo-50/50 hover:border-indigo-300 transition-colors relative">
+              <div className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 rounded-2xl p-5 cursor-pointer hover:bg-indigo-50/50 dark:hover:bg-slate-800 hover:border-indigo-300 dark:hover:border-indigo-500 transition-colors relative">
                 <input
                   type="file"
                   accept="image/*"
@@ -866,7 +941,7 @@ export default function EditProduct() {
                   className="absolute inset-0 opacity-0 cursor-pointer"
                 />
                 <Upload className="text-slate-400 mb-1.5" size={20} />
-                <p className="text-xs text-slate-600 font-bold">Upload Size Chart</p>
+                <p className="text-xs text-slate-600 dark:text-slate-300 font-bold">Upload Size Chart</p>
                 <p className="text-[10px] text-slate-400">Image of measurements guide</p>
               </div>
             )}

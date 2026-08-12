@@ -28,7 +28,7 @@ const Home = () => {
       <main className="flex-grow overflow-hidden">
         
         {/* Category Browsing */}
-        <section className="py-12 sm:py-16 md:py-20 bg-white border-y border-stone-100">
+        <section className=" py-4  sm:py-8 bg-[#FCFCFC] border-y border-stone-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <Category />
           </div>
@@ -43,10 +43,10 @@ const Home = () => {
 
         {/* Marketing Banners 1 & 2 */}
         <section className="space-y-8 sm:space-y-12 md:space-y-16 py-8 sm:py-12">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-full   ">
             <Benner1 />
           </div>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-full  ">
             <Benner2 />
           </div>
         </section>
@@ -57,7 +57,7 @@ const Home = () => {
         </div>
 
         {/* Custom Studio Banner */}
-        <section className="py-12 sm:py-16 bg-white border-y border-stone-100">
+        <section className="sm:py-16 bg-[#FCFCFC] border-y border-stone-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <CustomBanner />
           </div>
@@ -65,18 +65,18 @@ const Home = () => {
 
         {/* Final Promotional Banner */}
         <section className="py-12 sm:py-16 md:py-20">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className=" mx-auto  ">
             <Benner3 />
           </div>
         </section>
 
         {/* Interactive / Contact Call-To-Action */}
-        <section className="bg-stone-900 text-white py-16 sm:py-24">
-          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <section className="-py-30">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <LetsTalk />
           </div>
         </section>
-
+ 
       </main>
     </div>
   )

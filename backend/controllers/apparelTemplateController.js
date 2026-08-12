@@ -9,6 +9,33 @@ const DEFAULT_TEMPLATES = [
   { key: 'sports-jersey',  name: 'Sports Jersey',        basePrice: 499 },
 ];
 
+const DEFAULT_COLORS = ['#FFFFFF', '#000000', '#1E3A8A', '#DC2626'];
+const DEFAULT_SIZES = [
+  { size: 'S',   enabled: true,  priceAddon: 0 },
+  { size: 'M',   enabled: true,  priceAddon: 0 },
+  { size: 'L',   enabled: true,  priceAddon: 0 },
+  { size: 'XL',  enabled: true,  priceAddon: 0 },
+  { size: 'XXL', enabled: true,  priceAddon: 0 },
+  { size: '3XL', enabled: false, priceAddon: 0 },
+];
+
+// Keep the public customizer usable even before somebody opens the admin page.
+const ensureApparelTemplates = async () => {
+  let templates = await ApparelTemplate.find().sort({ createdAt: 1 });
+
+  if (templates.length === 0) {
+    templates = await ApparelTemplate.insertMany(
+      DEFAULT_TEMPLATES.map((template) => ({
+        ...template,
+        availableColors: DEFAULT_COLORS,
+        sizes: DEFAULT_SIZES,
+      }))
+    );
+  }
+
+  return templates;
+};
+
 /**
  * GET /api/admin/apparel-templates
  * Returns all apparel template configurations.
@@ -16,25 +43,8 @@ const DEFAULT_TEMPLATES = [
  */
 export const getApparelTemplates = async (req, res) => {
   try {
-    let templates = await ApparelTemplate.find().sort({ createdAt: 1 });
+    const templates = await ensureApparelTemplates();
 
-    if (templates.length === 0) {
-      // Seed defaults on first run
-      templates = await ApparelTemplate.insertMany(
-        DEFAULT_TEMPLATES.map((t) => ({
-          ...t,
-          availableColors: ['#FFFFFF', '#000000', '#1E3A8A', '#DC2626'],
-          sizes: [
-            { size: 'S',   enabled: true,  priceAddon: 0 },
-            { size: 'M',   enabled: true,  priceAddon: 0 },
-            { size: 'L',   enabled: true,  priceAddon: 0 },
-            { size: 'XL',  enabled: true,  priceAddon: 0 },
-            { size: 'XXL', enabled: true,  priceAddon: 0 },
-            { size: '3XL', enabled: false, priceAddon: 0 },
-          ],
-        }))
-      );
-    }
 
     res.json({ success: true, data: templates });
   } catch (err) {
@@ -96,6 +106,7 @@ export const updateApparelTemplate = async (req, res) => {
  */
 export const getPublicApparelTemplates = async (req, res) => {
   try {
+    await ensureApparelTemplates();
     const templates = await ApparelTemplate.find({ isActive: true })
       .select('key name basePrice availableColors sizes')
       .sort({ createdAt: 1 });

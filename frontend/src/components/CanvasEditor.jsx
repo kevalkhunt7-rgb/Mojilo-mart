@@ -39,12 +39,12 @@ export function withGuidesHidden(canvas, captureFn) {
 // ---------------------------------------------------------------------------
 import tshirtFrontSvg from "../assets/tshirt_front.svg";
 import tshirtBackSvg from "../assets/tshirt_back.svg";
-import longSleeveFrontSvg from "../assets/long-sleeve-front.svg";
-import longSleeveBackSvg from "../assets/long-sleeve-back.svg";
-import hoodieFrontSvg from "../assets/hoodie_front.svg";
-import hoodieBackSvg from "../assets/hoodie_back.svg";
-import oversizedFrontSvg from "../assets/oversized_front.svg";
-import oversizedBackSvg from "../assets/oversize-back.svg";
+import longSleeveFrontSvg from "../assets/long-sleeve-front-vector.svg";
+import longSleeveBackSvg from "../assets/long-sleeve-back-vector.svg";
+import hoodieFrontSvg from "../assets/hoodie-front-vector.svg";
+import hoodieBackSvg from "../assets/hoodie-back-vector.svg";
+import oversizedFrontSvg from "../assets/oversized-front-vector.svg";
+import oversizedBackSvg from "../assets/oversized-back-vector.svg";
 import sleeveSvg from "../assets/sleeve.svg";
 
 // Map each product + view combination to the right SVG asset.
@@ -67,17 +67,58 @@ function getGarmentSvg(product, view) {
 
 function GarmentSilhouette({ product, view, width, height }) {
   const svgSrc = getGarmentSvg(product, view);
+  const productColor = useCustomizerStore((state) => state.productColor) || "#FFFFFF";
+
+  const isDarkColor = (color) => {
+    if (!color) return false;
+    let hex = color.replace("#", "");
+    if (hex.length === 3) {
+      hex = hex.split("").map((c) => c + c).join("");
+    }
+    if (hex.length === 6) {
+      const r = parseInt(hex.substring(0, 2), 16);
+      const g = parseInt(hex.substring(2, 4), 16);
+      const b = parseInt(hex.substring(4, 6), 16);
+      const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+      return brightness < 128;
+    }
+    return false;
+  };
+
+  const dark = isDarkColor(productColor);
 
   return (
     <div
-      className="absolute inset-0 z-[2] pointer-events-none flex items-center justify-center"
+      className="absolute inset-0 z-[2] pointer-events-none flex items-center justify-center overflow-hidden"
       style={{ width, height }}
       aria-hidden="true"
     >
+      {/* 1. Color Mask Fill: shapes solid t-shirt background in productColor */}
+      <div
+        className="w-full h-full transition-colors duration-300"
+        style={{
+          backgroundColor: productColor,
+          WebkitMaskImage: `url(${svgSrc})`,
+          maskImage: `url(${svgSrc})`,
+          WebkitMaskSize: "contain",
+          maskSize: "contain",
+          WebkitMaskPosition: "center",
+          maskPosition: "center",
+          WebkitMaskRepeat: "no-repeat",
+          maskRepeat: "no-repeat",
+        }}
+      />
+
+      {/* 2. Vector Lines & Seams Overlay */}
       <img
         src={svgSrc}
         alt=""
-        className="w-full h-full object-contain opacity-[0.3] select-none"
+        className="absolute inset-0 w-full h-full object-contain select-none transition-all duration-300"
+        style={{
+          mixBlendMode: dark ? "screen" : "multiply",
+          opacity: dark ? 0.75 : 0.85,
+          filter: dark ? "invert(0.85)" : "none",
+        }}
         draggable={false}
       />
     </div>
@@ -265,7 +306,7 @@ function SingleCanvasViewport({ view, printArea, manualSync, isSelected, current
         const stored = localStorage.getItem(`tshirt-designer-${v}`);
         stateDump[v] = stored ? JSON.parse(stored) : [];
       });
-      stateDump[view] = canvas.getObjects().filter(o => o !== printAreaBox).map(o => o.toJSON(["isRosterName", "isRosterNumber"]));
+      stateDump[view] = canvas.getObjects().filter(o => o !== printAreaBox).map(o => o.toJSON(["isRosterName", "isRosterNumber", "isJerseyText", "isJerseyName", "isJerseyNumber"]));
 
       localStorage.setItem(`tshirt-designer-${view}`, JSON.stringify(stateDump[view]));
 
@@ -279,7 +320,7 @@ function SingleCanvasViewport({ view, printArea, manualSync, isSelected, current
         const stored = localStorage.getItem(`tshirt-designer-${v}`);
         stateDump[v] = stored ? JSON.parse(stored) : [];
       });
-      stateDump[view] = canvas.getObjects().filter(o => o !== printAreaBox).map(o => o.toJSON(["isRosterName", "isRosterNumber"]));
+      stateDump[view] = canvas.getObjects().filter(o => o !== printAreaBox).map(o => o.toJSON(["isRosterName", "isRosterNumber", "isJerseyText", "isJerseyName", "isJerseyNumber"]));
       pushSnapshot(stateDump);
     }, 150);
 
@@ -291,7 +332,15 @@ function SingleCanvasViewport({ view, printArea, manualSync, isSelected, current
         if (Array.isArray(parsed) && parsed.length > 0) {
           fabric.util.enlivenObjects(parsed)
             .then((objects) => {
-              objects.forEach((obj) => {
+              objects.forEach((obj, idx) => {
+                const item = parsed[idx];
+                if (item) {
+                  if (item.isRosterName) obj.isRosterName = item.isRosterName;
+                  if (item.isRosterNumber) obj.isRosterNumber = item.isRosterNumber;
+                  if (item.isJerseyText) obj.isJerseyText = item.isJerseyText;
+                  if (item.isJerseyName) obj.isJerseyName = item.isJerseyName;
+                  if (item.isJerseyNumber) obj.isJerseyNumber = item.isJerseyNumber;
+                }
                 canvas.add(obj);
               });
               canvas.renderAll();
@@ -518,7 +567,7 @@ function SingleCanvasViewport({ view, printArea, manualSync, isSelected, current
 
       {/* Grid underlay background */}
       <div
-        className="relative overflow-hidden border border-slate-200 rounded-xl"
+        className="relative overflow-hidden border  border-gray-900 rounded-xl"
         style={{
           width: `${canvasWidth}px`,
           height: `${canvasHeight}px`,

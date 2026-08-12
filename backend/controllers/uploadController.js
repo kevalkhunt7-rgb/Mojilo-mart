@@ -1,4 +1,5 @@
 import uploadService from '../services/uploadService.js';
+import { uploadBufferToCloudinary } from '../utils/cloudinaryHelper.js';
 import ApiResponse from '../utils/ApiResponse.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import UploadedImage from '../models/UploadedImage.js';
@@ -8,6 +9,52 @@ import ApiError from '../utils/ApiError.js';
 export const uploadDesignImage = asyncHandler(async (req, res) => {
   const result = await uploadService.uploadDesignImage(req.user ? req.user._id : null, req.file);
   res.status(200).json(new ApiResponse(200, result, 'Image uploaded successfully'));
+});
+
+export const uploadBase64Image = asyncHandler(async (req, res) => {
+  const { base64, folder } = req.body;
+
+  if (!base64 || typeof base64 !== 'string') {
+    throw new ApiError(400, 'Base64 payload is required');
+  }
+
+  let match = base64.match(/^data:([a-zA-Z0-9+/.-]+\/[a-zA-Z0-9+.-]+);base64,(.+)$/);
+  let mimeType = 'image/png';
+  let encodedData = '';
+
+  if (match) {
+    [, mimeType, encodedData] = match;
+  } else {
+    const cleanStr = base64.trim().replace(/^data:[^;]+;base64,/, '');
+    if (cleanStr && !cleanStr.startsWith('http') && !cleanStr.startsWith('blob:')) {
+      encodedData = cleanStr;
+    } else {
+      throw new ApiError(400, 'Invalid Base64 data URL');
+    }
+  }
+
+  const buffer = Buffer.from(encodedData, 'base64');
+
+  if (!buffer || buffer.length === 0) {
+    throw new ApiError(400, 'Invalid Base64 image data');
+  }
+
+  const folderName = folder && typeof folder === 'string' && folder.trim().length > 0
+    ? folder.trim()
+    : 'mojilo/base64';
+
+  try {
+    const result = await uploadBufferToCloudinary(buffer, folderName, { resource_type: 'auto' });
+    res.status(200).json(new ApiResponse(200, {
+      url: result.secure_url,
+      publicId: result.public_id,
+      width: result.width,
+      height: result.height,
+      mimeType,
+    }, 'Base64 image uploaded successfully'));
+  } catch (error) {
+    throw new ApiError(500, `Cloudinary Base64 upload failed: ${error.message}`);
+  }
 });
 
 export const getMyUploads = asyncHandler(async (req, res) => {

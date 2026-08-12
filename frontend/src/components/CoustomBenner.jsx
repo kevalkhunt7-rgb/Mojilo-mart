@@ -7,7 +7,7 @@ const CustomBanner = () => {
 
   return (
     // Outer container: responsive horizontal padding
-    <div className="w-full max-w-3xl mx-auto px-4 py-8 md:py-16">
+    <div className="w-full bg-[#FCFCFC] max-w-5xl mx-auto px-4 py-8 md:py-16">
       {/* Card: responsive rounding and padding */}
       <div className="bg-[#f3f0fa] rounded-3xl p-6 sm:p-10 md:p-12 flex flex-col md:flex-row items-center justify-between gap-8 shadow-sm">
         

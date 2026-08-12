@@ -24,7 +24,7 @@ export const generateInvoicePDF = (order) => {
       doc.fontSize(10).fillColor('#555555')
         .text(`Order Number: ${order.orderNumber || order._id}`, 400, 75, { align: 'right' })
         .text(`Date: ${new Date(order.createdAt || Date.now()).toLocaleDateString()}`, 400, 90, { align: 'right' })
-        .text(`Payment: ${order.paymentMethod || 'COD'}`, 400, 105, { align: 'right' });
+        .text(`Payment: ${order.paymentMethod || 'Online'}`, 400, 105, { align: 'right' });
 
       doc.moveTo(50, 130).lineTo(550, 130).strokeColor('#e5e5e5').stroke();
 

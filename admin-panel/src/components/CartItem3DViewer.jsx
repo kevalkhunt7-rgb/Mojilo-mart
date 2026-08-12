@@ -119,7 +119,7 @@ function extractRawViewDecal(item, customizationData, possibleKeys) {
       if (!val) continue;
       const cleanPk = pk.toLowerCase().replace(/[\s_-]/g, "");
       if (cleanPk === cleanK || cleanPk.includes(cleanK) || cleanK.includes(cleanPk)) {
-        return { src: val, layer: null };
+        return { src: val, layer: null, isPreview: true };
       }
     }
   }
@@ -131,7 +131,7 @@ function extractRawViewDecal(item, customizationData, possibleKeys) {
       if (!val) continue;
       const cleanFk = fk.toLowerCase().replace(/[\s_-]/g, "");
       if (cleanFk === cleanK || cleanFk.includes(cleanK)) {
-        return { src: val, layer: null };
+        return { src: val, layer: null, isPreview: true };
       }
     }
   }
@@ -149,7 +149,7 @@ function extractRawViewDecal(item, customizationData, possibleKeys) {
       const area = (l.printAreaName || l.areaName || "").toLowerCase().replace(/[\s_-]/g, "");
       if (area === cleanK || area.includes(cleanK)) {
         const img = l.imageConfig?.processedUrl || l.imageConfig?.originalUrl || l.src || l.url;
-        if (img) return { src: img, layer: l };
+        if (img) return { src: img, layer: l, isPreview: false };
       }
     }
   }
@@ -168,7 +168,7 @@ function extractRawViewDecal(item, customizationData, possibleKeys) {
               const list = Array.isArray(objs) ? objs : objs?.objects || [];
               for (const obj of list) {
                 if (obj && (obj.src || obj.url)) {
-                  return { src: obj.src || obj.url, layer: obj };
+                  return { src: obj.src || obj.url, layer: obj, isPreview: false };
                 }
               }
             }
@@ -186,7 +186,7 @@ function extractRawViewDecal(item, customizationData, possibleKeys) {
       item?.previewUrl ||
       item?.image ||
       null;
-    return fallback ? { src: fallback, layer: null } : null;
+    return fallback ? { src: fallback, layer: null, isPreview: true } : null;
   }
 
   return null;
@@ -220,18 +220,16 @@ function ModelWrapper({ item, customization, processedTextures }) {
   };
 
   return (
-    <Bounds fit clip observe margin={1.2}>
-      <Center>
-        {modelKey === "sports_jersey" && <SportsJerseyModel {...modelProps} />}
-        {modelKey === "oversized" && <OversizedModel {...modelProps} />}
-        {modelKey === "long_sleeve" && <LongSleeveModel {...modelProps} />}
-        {modelKey === "hoodie" && <HoodieModel {...modelProps} />}
-        {(modelKey === "half_sleeve" ||
-          !["sports_jersey", "oversized", "long_sleeve", "hoodie"].includes(modelKey)) && (
-          <TshirtModel {...modelProps} />
-        )}
-      </Center>
-    </Bounds>
+    <Center>
+      {modelKey === "sports_jersey" && <SportsJerseyModel {...modelProps} />}
+      {modelKey === "oversized" && <OversizedModel {...modelProps} />}
+      {modelKey === "long_sleeve" && <LongSleeveModel {...modelProps} />}
+      {modelKey === "hoodie" && <HoodieModel {...modelProps} />}
+      {(modelKey === "half_sleeve" ||
+        !["sports_jersey", "oversized", "long_sleeve", "hoodie"].includes(modelKey)) && (
+        <TshirtModel {...modelProps} />
+      )}
+    </Center>
   );
 }
 
@@ -296,11 +294,19 @@ export function CartItem3DViewer({ item }) {
       const rawLeft = extractRawViewDecal(item, customizationData, ["left", "leftsleeve", "left sleeve"]);
       const rawRight = extractRawViewDecal(item, customizationData, ["right", "rightsleeve", "right sleeve"]);
 
+      const processDecal = (decalObj) => {
+        if (!decalObj || !decalObj.src) return Promise.resolve(null);
+        if (decalObj.isPreview || !decalObj.layer) {
+          return Promise.resolve(decalObj.src);
+        }
+        return renderLayerToPaddedCanvasAsync(decalObj.src, decalObj.layer);
+      };
+
       const [front, back, left, right] = await Promise.all([
-        rawFront ? renderLayerToPaddedCanvasAsync(rawFront.src, rawFront.layer) : Promise.resolve(null),
-        rawBack ? renderLayerToPaddedCanvasAsync(rawBack.src, rawBack.layer) : Promise.resolve(null),
-        rawLeft ? renderLayerToPaddedCanvasAsync(rawLeft.src, rawLeft.layer) : Promise.resolve(null),
-        rawRight ? renderLayerToPaddedCanvasAsync(rawRight.src, rawRight.layer) : Promise.resolve(null),
+        processDecal(rawFront),
+        processDecal(rawBack),
+        processDecal(rawLeft),
+        processDecal(rawRight),
       ]);
 
       if (isMounted) {
@@ -327,7 +333,7 @@ export function CartItem3DViewer({ item }) {
       )}
 
       <Canvas
-        camera={{ position: [0, 0, 7], fov: 45 }}
+        camera={{ position: [0, -0.1, 12], fov: 38 }}
         gl={{
           antialias: true,
           preserveDrawingBuffer: true,

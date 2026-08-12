@@ -12,6 +12,8 @@ import Order from '../models/Order.js';
 import Cart from '../models/Cart.js';
 import CustomCart from '../models/customCart.js';
 import Customization from '../models/Customization.js';
+import Payment from '../models/Payment.js';
+import Invoice from '../models/Invoice.js';
 import customCartService from './customCartService.js';
 import ApiError from '../utils/ApiError.js';
 import logger from '../utils/logger.js';
@@ -92,14 +94,16 @@ class OrderService {
       }
     }
 
-    // 3. Calculate Prices from item snapshots (prioritize active salePrice)
+    // 3. Calculate Prices from item snapshots (prioritize explicit item.price from dynamic size pricing)
     let calculatedSubTotal = allCartItems.reduce((sum, item) => {
       const prod = item.product;
-      const unitPrice = (prod?.salePrice && Number(prod.salePrice) > 0)
-        ? Number(prod.salePrice)
-        : ((prod?.price && Number(prod.price) > 0)
-            ? Number(prod.price)
-            : (prod?.basePrice || item.price || 0));
+      const unitPrice = (item.price && Number(item.price) > 0)
+        ? Number(item.price)
+        : ((prod?.salePrice && Number(prod.salePrice) > 0)
+            ? Number(prod.salePrice)
+            : ((prod?.price && Number(prod.price) > 0)
+                ? Number(prod.price)
+                : (prod?.basePrice || 0)));
       return sum + (unitPrice * (item.quantity || 1));
     }, 0);
 
@@ -125,7 +129,7 @@ class OrderService {
     // 4. Create Order Number
     const orderNumber = `MOJ-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    const initialStatus = paymentMethod === 'COD' ? 'confirmed' : 'pending';
+    const initialStatus = 'pending';
 
     // 5. Create Order with snapshot summary
     const order = await orderRepository.create({
@@ -139,7 +143,7 @@ class OrderService {
       discountAmount,
       subTotal,
       totalAmount,
-      paymentMethod: paymentMethod || 'COD',
+      paymentMethod: 'Online',
       paymentStatus: 'pending',
       orderStatus: initialStatus,
       coupon: couponId,
@@ -153,7 +157,7 @@ class OrderService {
       },
       statusHistory: [{
         status: initialStatus,
-        notes: paymentMethod === 'COD' ? 'Order placed and confirmed (COD).' : 'Order created, awaiting online payment confirmation.',
+        notes: 'Order created, awaiting online payment confirmation.',
         updatedBy: 'system'
       }]
     });
@@ -235,6 +239,10 @@ class OrderService {
         }
       }
 
+      const frontImg = rawCust.decalUrl || rawCust.previewUrl || rawCust.previews?.front || rawCust.frontPreview || item.image || item.decalUrl || null;
+      const prodImg = item.product?.image || item.product?.imageUrl || item.product?.images?.[0]?.url || (typeof item.product?.images?.[0] === 'string' ? item.product?.images?.[0] : null);
+      const finalImg = frontImg || item.image || item.imageUrl || prodImg || null;
+
       const orderItem = await OrderItem.create({
         order: order._id,
         product: item.product?._id || null,
@@ -246,6 +254,9 @@ class OrderService {
         size: item.size || 'M',
         quantity: item.quantity || 1,
         price: item.price || 0,
+        image: finalImg,
+        decalUrl: frontImg,
+        previewUrl: frontImg,
         pricing: {
           basePrice: item.pricing?.basePrice || item.price || 0,
           customizationCost: item.pricing?.customizationCost || 0,
@@ -268,29 +279,9 @@ class OrderService {
       logger.error('Failed to generate invoice for order:', err);
     }
 
-    // 8. Clear standard & custom carts upon successful order creation
-    if (cart) {
-      cart.items = [];
-      cart.totalAmount = 0;
-      await cart.save();
-    }
-    try {
-      await customCartService.clearCart({ userId }, false);
-    } catch (err) {
-      logger.error(`Failed to clear custom cart for user ${userId} on checkout:`, err);
-    }
 
-    if (paymentMethod === 'COD') {
-      // Trigger print rendering background job
-      try {
-        await enqueuePrintGeneration(order._id);
-      } catch (err) {
-        logger.error(`Failed to enqueue print files generation for COD Order ${order._id}:`, err);
-      }
 
-      // Trigger asynchronous email confirmation
-      this.sendConfirmationEmailAsync(userId, order);
-    }
+
 
     return {
       order,
@@ -334,6 +325,42 @@ class OrderService {
 
     await order.save();
     return order;
+  }
+
+  /**
+   * Cancel and delete an unpaid pending order if payment is cancelled or fails
+   */
+  async cancelUnpaidOrder(orderId, userId) {
+    const order = await Order.findOne({ _id: orderId, user: userId });
+    if (!order) {
+      return { message: 'Order not found or already removed' };
+    }
+
+    if (order.paymentStatus !== 'pending' && order.paymentStatus !== 'failed') {
+      throw new ApiError(400, 'Paid or processed orders cannot be cancelled via this endpoint');
+    }
+
+    // 1. Restore stock for items
+    const orderItems = await OrderItem.find({ order: order._id });
+    for (const item of orderItems) {
+      if (item.productVariant) {
+        await inventoryRepository.restoreStock(item.productVariant, item.quantity);
+      }
+    }
+
+    // 2. Decrement coupon usage if coupon was applied
+    if (order.coupon) {
+      await couponRepository.decrementUsage(order.coupon);
+    }
+
+    // 3. Remove OrderItems, Payments, Invoices, and Order
+    await OrderItem.deleteMany({ order: order._id });
+    await Payment.deleteMany({ order: order._id });
+    await Invoice.deleteMany({ order: order._id });
+    await Order.findByIdAndDelete(order._id);
+
+    logger.info(`[OrderService] Cancelled and removed unpaid pending order: ${orderId}`);
+    return { success: true, message: 'Unpaid order cancelled successfully' };
   }
 }
 

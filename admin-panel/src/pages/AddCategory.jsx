@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import axios from 'axios';
+import api from '../lib/axios';
 import { useNavigate } from 'react-router-dom';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -79,16 +79,10 @@ export default function AddCategory() {
         });
       }
 
-      await axios.post(
-        '/api/categories',
-        {
-          name: name.trim(),
-          image: imageBase64,
-        },
-        {
-          withCredentials: true,
-        }
-      );
+      await api.post('/categories', {
+        name: name.trim(),
+        image: imageBase64,
+      });
 
       toast.success('Category created successfully!');
 

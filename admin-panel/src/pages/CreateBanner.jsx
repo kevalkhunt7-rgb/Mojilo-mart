@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../lib/axios';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { ArrowLeft, Image, Type, Link, BarChart3, Tag } from 'lucide-react';
@@ -64,9 +64,8 @@ export default function CreateBanner() {
 
     try {
       setLoading(true);
-      await axios.post('/api/banners', data, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        withCredentials: true
+      await api.post('/banners', data, {
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
       toast.success('Hero slider banner deployed successfully!');
       setTimeout(() => navigate('/banners'), 1500);

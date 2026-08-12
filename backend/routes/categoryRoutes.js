@@ -16,45 +16,73 @@ import { validate } from '../middlewares/validate.js';
 
 const router = express.Router();
 
-// Optional authentication middleware
+/**
+ * Optional authentication
+ * Never blocks public requests.
+ * If authentication fails for any reason, it simply continues.
+ */
 const optionalProtect = async (req, res, next) => {
-  let token;
+  try {
+    let token;
 
-  if (
-    req.headers.authorization &&
-    req.headers.authorization.startsWith('Bearer')
-  ) {
-    token = req.headers.authorization.split(' ')[1];
-  } else if (req.cookies?.accessToken) {
-    token = req.cookies.accessToken;
-  }
+    // Authorization Header
+    if (
+      req.headers.authorization &&
+      req.headers.authorization.startsWith('Bearer')
+    ) {
+      token = req.headers.authorization.split(' ')[1];
+    }
 
-  if (!token) {
+    // Cookie
+    if (!token && req.cookies?.accessToken) {
+      token = req.cookies.accessToken;
+    }
+
+    // No token -> public request
+    if (!token) {
+      return next();
+    }
+
+    let decoded;
+
+    try {
+      decoded = jwt.verify(
+        token,
+        process.env.JWT_SECRET || 'jwt_access_secret_key'
+      );
+    } catch (err) {
+      console.warn('Invalid JWT in optionalProtect:', err.message);
+      return next();
+    }
+
+    try {
+      const user = await User.findById(decoded.id)
+        .select('-password')
+        .lean();
+
+      if (user) {
+        req.user = user;
+      }
+    } catch (err) {
+      console.error('User lookup failed:', err.message);
+      // Continue anyway
+    }
+
+    return next();
+  } catch (err) {
+    console.error('optionalProtect error:', err);
     return next();
   }
-
-  try {
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET || 'jwt_access_secret_key'
-    );
-
-    const user = await User.findById(decoded.id).select('-password');
-
-    if (user) {
-      req.user = user;
-    }
-  } catch (error) {
-    // Ignore invalid token
-  }
-
-  next();
 };
 
-// Public Route
-router.get('/', optionalProtect, getCategories);
+/* ---------------------- PUBLIC ROUTES ---------------------- */
 
-// Admin Routes
+router.get('/', getCategories);
+// If you actually need req.user on this endpoint, use:
+// router.get('/', optionalProtect, getCategories);
+
+/* ---------------------- ADMIN ROUTES ---------------------- */
+
 router.post(
   '/',
   protect,

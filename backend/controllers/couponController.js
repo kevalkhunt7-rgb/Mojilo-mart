@@ -16,6 +16,16 @@ export const createCoupon = asyncHandler(async (req, res) => {
   res.status(201).json(new ApiResponse(201, coupon, 'Coupon created successfully'));
 });
 
+export const getAvailableCoupons = asyncHandler(async (req, res) => {
+  const now = new Date();
+  const coupons = await Coupon.find({
+    isActive: true,
+    $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }]
+  }).sort({ createdAt: -1 });
+
+  res.status(200).json(new ApiResponse(200, coupons, 'Available coupons retrieved successfully'));
+});
+
 export const getCoupons = asyncHandler(async (req, res) => {
   const coupons = await Coupon.find({}).sort({ createdAt: -1 });
   res.status(200).json(new ApiResponse(200, coupons, 'Coupons retrieved successfully'));

@@ -309,9 +309,63 @@ class CartService {
         if (!variant && item.product) {
           variant = await ProductVariant.findOne({ product: item.product }).populate('product');
         }
+
+        // Fallback for non-customizable catalog products without variant documents
+        if (!variant && item.product) {
+          const productDoc = await Product.findById(item.product);
+          if (productDoc) {
+            let sizePrice = null;
+            if (item.size && Array.isArray(productDoc.sizes)) {
+              const matchedSize = productDoc.sizes.find(
+                (s) => (typeof s === 'object' ? s.size : s) === item.size
+              );
+              if (matchedSize && typeof matchedSize === 'object' && matchedSize.price != null && matchedSize.price !== '') {
+                const parsed = Number(matchedSize.price);
+                if (!isNaN(parsed) && parsed > 0) {
+                  sizePrice = parsed;
+                }
+              }
+            }
+
+            const defaultPrice = (productDoc.salePrice && Number(productDoc.salePrice) > 0)
+              ? Number(productDoc.salePrice)
+              : (productDoc.price || productDoc.basePrice || 0);
+
+            const effectivePrice = sizePrice !== null ? sizePrice : defaultPrice;
+
+            variant = {
+              price: effectivePrice,
+              basePrice: sizePrice || productDoc.basePrice || effectivePrice,
+              product: productDoc
+            };
+          }
+        } else if (variant && variant.product) {
+          const productDoc = variant.product;
+          if (item.size && Array.isArray(productDoc.sizes)) {
+            const matchedSize = productDoc.sizes.find(
+              (s) => (typeof s === 'object' ? s.size : s) === item.size
+            );
+            if (matchedSize && typeof matchedSize === 'object' && matchedSize.price != null && matchedSize.price !== '') {
+              const parsed = Number(matchedSize.price);
+              if (!isNaN(parsed) && parsed > 0) {
+                variant.price = parsed;
+              }
+            }
+          }
+        }
       }
 
       if (!variant) continue;
+
+      const explicitUnitPrice = item.price && !isNaN(Number(item.price)) && Number(item.price) > 0
+        ? Number(item.price)
+        : null;
+      if (explicitUnitPrice !== null) {
+        variant.price = explicitUnitPrice;
+        if (!variant.basePrice || isNaN(Number(variant.basePrice)) || Number(variant.basePrice) <= 0) {
+          variant.basePrice = explicitUnitPrice;
+        }
+      }
 
       const itemPricing = pricingService.calculatePrice({
         customization,
@@ -324,7 +378,7 @@ class CartService {
         customizationCost: itemPricing.customizationCost,
         printCost: itemPricing.printAreaCost
       };
-      item.price = itemPricing.singleItemTotal;
+      item.price = explicitUnitPrice !== null ? explicitUnitPrice : itemPricing.singleItemTotal;
       grandTotal += itemPricing.subTotal;
     }
 
@@ -336,7 +390,7 @@ class CartService {
   /**
    * Add a customized product item to the shopping cart
    */
-  async addCustomizedProduct({ userId, sessionId }, { productId, variantId, customizationId, color, size, quantity }) {
+  async addCustomizedProduct({ userId, sessionId }, { productId, variantId, customizationId, color, size, price, quantity }) {
   // 1. Perform foundational context validation checks
   await this.validateCustomization({ productId, variantId, color, size, customizationId, userId });
 
@@ -356,6 +410,9 @@ class CartService {
 
   if (existingIndex > -1 && !snapshotCustomizationId) {
     cart.items[existingIndex].quantity += Number(quantity);
+    if (price && Number(price) > 0) {
+      cart.items[existingIndex].price = Number(price);
+    }
   } else {
     cart.items.push({
       product: productId || null,
@@ -364,7 +421,7 @@ class CartService {
       color,
       size,
       quantity: Number(quantity),
-      price: 0 // Settled inside execution block of recalculateCart
+      price: price && Number(price) > 0 ? Number(price) : 0
     });
   }
 

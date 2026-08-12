@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import api from '../lib/axios';
 import { useNavigate } from 'react-router-dom';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -27,7 +27,7 @@ export default function VariantsPage() {
 
   const fetchVariants = async () => {
     try {
-      const res = await axios.get('/api/variants', { withCredentials: true });
+      const res = await api.get('/variants');
       setVariants(res.data?.data || []);
     } catch (err) {
       toast.error('Failed to load variants database');
@@ -37,7 +37,7 @@ export default function VariantsPage() {
 
   const fetchAttributes = async () => {
     try {
-      const res = await axios.get('/api/variants/attributes', { withCredentials: true });
+      const res = await api.get('/variants/attributes');
       setAttributesConfig(res.data?.data || []);
     } catch (err) {
       console.error('Failed to load attributes configuration', err);
@@ -56,7 +56,7 @@ export default function VariantsPage() {
 
   const handleDelete = async (id) => {
     try {
-      await axios.delete(`/api/variants/${id}`, { withCredentials: true });
+      await api.delete(`/variants/${id}`);
       toast.success('Product variant deleted successfully!');
       setConfirmDeleteId(null);
       fetchVariants();
@@ -76,11 +76,11 @@ export default function VariantsPage() {
       // Append garment type to the name to keep it organized (e.g. "Oversized Coral Orange" or "Hoodie Charcoal")
       const finalName = `${selectedGarment} - ${newValueName}`;
 
-      await axios.post('/api/variants/attributes/values', {
+      await api.post('/variants/attributes/values', {
         attributeName: newAttrName,
         name: finalName,
         value: newValueRaw
-      }, { withCredentials: true });
+      });
 
       toast.success(`Custom ${newAttrName} option saved successfully!`);
       setNewValueName('');
@@ -95,7 +95,7 @@ export default function VariantsPage() {
 
   const handleDeleteAttributeValue = async (valId) => {
     try {
-      await axios.delete(`/api/variants/attributes/values/${valId}`, { withCredentials: true });
+      await api.delete(`/variants/attributes/values/${valId}`);
       toast.success('Attribute option removed successfully!');
       fetchAttributes();
     } catch (err) {

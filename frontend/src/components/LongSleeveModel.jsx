@@ -88,9 +88,9 @@ export function LongSleeveModel({
                 <>
                   {frontTexture && (
                     <Decal
-                      position={[0, 125, 12]}
+                      position={[-2, 125, 12]}
                       rotation={[0, 0, 0]}
-                      scale={[55, 65, 20]}
+                      scale={[80, 120, 20]}
                       onClick={() => handleClick("front")}
                     >
                       <meshStandardMaterial
@@ -106,7 +106,7 @@ export function LongSleeveModel({
                     <Decal
                       position={[0, 125, -12]}
                       rotation={[0, Math.PI, 0]}
-                      scale={[55, 65, 20]}
+                      scale={[80, 120, 20]}
                       onClick={() => handleClick("back")}
                     >
                       <meshStandardMaterial

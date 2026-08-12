@@ -77,6 +77,14 @@ const productSchema = new mongoose.Schema({
     default: 0,
     min: 0,
   },
+  // Aggregated rating distribution (counts for each star value)
+  ratingDistribution: {
+    '5': { type: Number, default: 0 },
+    '4': { type: Number, default: 0 },
+    '3': { type: Number, default: 0 },
+    '2': { type: Number, default: 0 },
+    '1': { type: Number, default: 0 },
+  },
   isActive: {
     type: Boolean,
     default: true,
@@ -84,7 +92,7 @@ const productSchema = new mongoose.Schema({
   sku: {
     type: String,
     trim: true,
-    sparse: true, // Allows multiple docs without SKU
+    sparse: true,
   },
   status: {
     type: String,
@@ -108,8 +116,8 @@ const productSchema = new mongoose.Schema({
     trim: true,
   }],
   sizes: [{
-    type: String,
-    trim: true,
+    size: { type: String, required: true, trim: true },
+    price: { type: Number, default: null } // Optional size price override
   }],
   searchTags: [{
     type: String,
@@ -121,12 +129,21 @@ const productSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-// Indexes for common queries
-productSchema.index({ category: 1, basePrice: 1 });
+// Single field indexes
 productSchema.index({ slug: 1 });
 productSchema.index({ sku: 1 }, { sparse: true });
 
-// Combined text search index (including searchTags for better search relevance)
+// CRITICAL OPTIMIZATION: Compound Indexes matching query patterns
+productSchema.index({ isActive: 1, status: 1, createdAt: -1 });
+productSchema.index({ isActive: 1, status: 1, category: 1, createdAt: -1 });
+productSchema.index({ isActive: 1, status: 1, gender: 1, createdAt: -1 });
+productSchema.index({ isActive: 1, status: 1, basePrice: 1 });
+productSchema.index({ isActive: 1, tags: 1 });
+productSchema.index({ isActive: 1, collections: 1 });
+productSchema.index({ isActive: 1, featured: 1, createdAt: -1 });
+productSchema.index({ isActive: 1, newArrival: 1, createdAt: -1 });
+
+// Text search index
 productSchema.index({ 
   name: 'text', 
   description: 'text', 

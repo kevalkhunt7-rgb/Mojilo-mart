@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useCustomizerStore } from "../store/useCustomizerStore";
 import { apparelConfig } from "../utils/apparelConfig";
-import { Shirt } from "lucide-react";
+import { Shirt, Check } from "lucide-react";
 import { useCanvas } from "../context/CanvasContext";
 import api from "../lib/axios";
 
@@ -60,7 +60,7 @@ export default function ProductSelector() {
       key,
       name: live?.name ?? cfg.name,
       basePrice: live?.basePrice ?? cfg.basePrice,
-      isActive: live?.isActive ?? true,
+      isActive: apparelTemplates === null ? true : Boolean(live),
     };
   }).filter((p) => p.isActive);
 
@@ -73,12 +73,16 @@ export default function ProductSelector() {
       {loading && products.length === 0 ? (
         <div className="space-y-2">
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-10 rounded-xl bg-slate-100 animate-pulse" />
+            <div
+              key={i}
+              style={{ animationDelay: `${i * 60}ms` }}
+              className="h-10 rounded-xl bg-slate-100 animate-pulse"
+            />
           ))}
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-2">
-          {products.map(({ key, name, basePrice }) => {
+          {products.map(({ key, name, basePrice }, idx) => {
             const isSelected = currentProduct === key;
             return (
               <button
@@ -89,25 +93,51 @@ export default function ProductSelector() {
                     setCurrentProduct(key);
                   }
                 }}
-                className={`flex items-center justify-between p-3 rounded-xl border text-left transition-all duration-200 cursor-pointer ${
+                style={{ animationDelay: `${idx * 40}ms` }}
+                className={`group relative flex items-center justify-between p-3 rounded-xl border text-left transition-all duration-200 cursor-pointer overflow-hidden animate-in fade-in slide-in-from-left-1 fill-mode-backwards hover:-translate-y-0.5 active:scale-[0.98] active:translate-y-0 ${
                   isSelected
-                    ? "bg-slate-900 border-slate-900 text-white shadow-md scale-[1.02]"
-                    : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300"
+                    ? "bg-[#997241] border-[#997241] text-white shadow-md shadow-[#997241]/30 scale-[1.02]"
+                    : "bg-white border-slate-200 text-slate-700 hover:bg-[#F5EFE6] hover:border-[#997241]/40 hover:shadow-sm"
                 }`}
               >
-                <div className="flex items-center gap-2">
-                  <Shirt
-                    className={`h-4.5 w-4.5 ${isSelected ? "text-amber-400" : "text-slate-400"}`}
-                  />
+                {/* subtle sheen sweep on the active card */}
+                {isSelected && (
+                  <span className="pointer-events-none absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+                )}
+
+                <div className="relative flex items-center gap-2">
+                  <span
+                    className={`flex items-center justify-center h-6 w-6 rounded-lg shrink-0 transition-all duration-200 ${
+                      isSelected ? "bg-white/15 scale-105" : "bg-slate-50 group-hover:bg-[#997241]/10"
+                    }`}
+                  >
+                    <Shirt
+                      className={`h-4 w-4 transition-colors duration-200 ${
+                        isSelected ? "text-white" : "text-slate-400 group-hover:text-[#997241]"
+                      }`}
+                    />
+                  </span>
                   <span className="text-xs font-bold">{name}</span>
                 </div>
-                <span
-                  className={`text-[10px] font-bold ${
-                    isSelected ? "text-amber-300" : "text-slate-400"
-                  }`}
-                >
-                  ₹{typeof basePrice === "number" ? basePrice.toFixed(2) : basePrice}
-                </span>
+
+                <div className="relative flex items-center gap-2">
+                  <span
+                    className={`text-[10px] font-bold transition-colors duration-200 ${
+                      isSelected ? "text-white/90" : "text-slate-400 group-hover:text-[#997241]"
+                    }`}
+                  >
+                    ₹{typeof basePrice === "number" ? basePrice.toFixed(2) : basePrice}
+                  </span>
+                  <span
+                    className={`flex items-center justify-center h-4 w-4 rounded-full border transition-all duration-200 ${
+                      isSelected
+                        ? "bg-white border-white scale-100 opacity-100"
+                        : "border-slate-300 scale-75 opacity-0"
+                    }`}
+                  >
+                    <Check size={10} strokeWidth={3} className="text-[#997241]" />
+                  </span>
+                </div>
               </button>
             );
           })}

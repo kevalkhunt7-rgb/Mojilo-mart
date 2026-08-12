@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../lib/axios';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { Plus, Eye, EyeOff, Trash2, Edit2, Sliders, Layers, ArrowUpRight } from 'lucide-react';
@@ -13,7 +13,7 @@ export default function Banners() {
   const fetchBanners = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/banners', { withCredentials: true });
+      const response = await api.get('/banners');
       setBanners(response.data.data || response.data);
     } catch (err) {
       toast.error('Could not populate active catalog banner slides');
@@ -29,9 +29,8 @@ export default function Banners() {
 
   const toggleVisibility = async (id, currentStatus) => {
     try {
-      await axios.patch(`/api/banners/${id}`, 
-        { isActive: !currentStatus },
-        { withCredentials: true }
+      await api.patch(`/banners/${id}`, 
+        { isActive: !currentStatus }
       );
       toast.success('Banner placement visibility updated');
       setBanners(banners.map(b => b._id === id ? { ...b, isActive: !currentStatus } : b));
@@ -43,7 +42,7 @@ export default function Banners() {
   const handleDelete = async (id) => {
     if (!window.confirm('Are you certain you want to remove this hero slider layout sequence entry?')) return;
     try {
-      await axios.delete(`/api/banners/${id}`, { withCredentials: true });
+      await api.delete(`/banners/${id}`);
       toast.success('Promotional entry wiped out clean');
       setBanners(banners.filter(b => b._id !== id));
     } catch (err) {
@@ -56,36 +55,43 @@ export default function Banners() {
       <ToastContainer />
 
       {/* Main Feature Actions Control Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-[#e2e8f0] shadow-sm">
-        <div>
-          <h1 className="text-xl font-bold text-[#0f172a] tracking-tight flex items-center gap-2">
-            <Sliders size={20} className="text-indigo-600" /> Landing Hero Management
+      <div className="relative overflow-hidden flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-gradient-to-br from-[#312e81] via-[#3730a3] to-[#4338ca] p-5 sm:p-7 rounded-2xl shadow-lg shadow-indigo-900/20">
+        <div className="absolute -right-10 -top-16 w-56 h-56 rounded-full bg-white/5" />
+        <div className="absolute right-24 -bottom-20 w-40 h-40 rounded-full bg-white/5" />
+        <div className="relative">
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-200 mb-1">Marketing & Promotions</p>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+            <Sliders size={20} className="text-indigo-200" /> Landing Hero Management
           </h1>
-          <p className="text-xs text-[#64748b] mt-0.5">Control home slider banners, marketing hooks, direct traffic destinations, and quick stat counters.</p>
+          <p className="text-sm text-indigo-200/80 mt-1">
+            Control home slider banners, marketing hooks, direct traffic destinations, and quick stat counters.
+          </p>
         </div>
-        
-        <button
-          onClick={() => navigate('/banners/create')}
-          className="flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-sm active:scale-95 self-start sm:self-auto"
-        >
-          <Plus size={16} />
-          Add New Banner
-        </button>
+
+        <div className="relative shrink-0">
+          <button
+            onClick={() => navigate('/banners/create')}
+            className="flex items-center justify-center gap-1.5 bg-white hover:bg-indigo-50 text-indigo-700 font-semibold text-sm px-4 py-2.5 rounded-xl shadow-sm transition-colors active:scale-[0.98] w-full sm:w-auto cursor-pointer"
+          >
+            <Plus size={16} />
+            Add New Banner
+          </button>
+        </div>
       </div>
 
       {loading ? (
-        <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-sm font-semibold text-slate-400">
+        <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-12 text-center text-sm font-semibold text-slate-400 dark:text-slate-500">
           Loading layout presentations...
         </div>
       ) : banners.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center space-y-3">
-          <div className="inline-flex p-3 bg-slate-50 text-slate-400 rounded-xl border border-slate-100">
+        <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-dashed border-slate-300 dark:border-slate-800 p-12 text-center space-y-3">
+          <div className="inline-flex p-3 bg-slate-50 dark:bg-slate-900/50 text-slate-400 dark:text-slate-500 rounded-xl border border-slate-100 dark:border-slate-800">
             <Layers size={24} />
           </div>
-          <h3 className="text-sm font-bold text-slate-700">No Hero Banners Formed Yet</h3>
+          <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">No Hero Banners Formed Yet</h3>
           <button
             onClick={() => navigate('/banners/create')}
-            className="text-xs font-bold text-indigo-600 hover:text-indigo-700 inline-flex items-center gap-1 mt-1"
+            className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 inline-flex items-center gap-1 mt-1 cursor-pointer"
           >
             Deploy your first deck banner <Plus size={14} />
           </button>
@@ -95,12 +101,14 @@ export default function Banners() {
           {banners.map((banner) => (
             <div 
               key={banner._id} 
-              className={`bg-white rounded-2xl border transition-all duration-200 overflow-hidden flex flex-col group ${
-                banner.isActive ? 'border-slate-200 hover:shadow-md' : 'border-slate-200 bg-slate-50/50 opacity-75'
+              className={`bg-white dark:bg-[#0f172a] rounded-2xl border transition-all duration-200 overflow-hidden flex flex-col group ${
+                banner.isActive 
+                  ? 'border-slate-200 dark:border-slate-800 hover:shadow-md' 
+                  : 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 opacity-75'
               }`}
             >
               {/* Media Container Box with Dynamic String Fallback */}
-              <div className="relative aspect-[21/9] w-full bg-slate-100 overflow-hidden border-b flex items-center justify-center min-h-[160px]">
+              <div className="relative aspect-[21/9] w-full bg-slate-100 dark:bg-slate-900 overflow-hidden border-b border-slate-200 dark:border-slate-800 flex items-center justify-center min-h-[160px]">
                 <img 
                   src={banner.image?.url || "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800"} 
                   alt={banner.title} 
@@ -115,7 +123,9 @@ export default function Banners() {
                 </span>
 
                 <span className={`absolute top-3 right-3 text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                  banner.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'
+                  banner.isActive 
+                    ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-800/50' 
+                    : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                 }`}>
                   {banner.isActive ? 'Active' : 'Inactive'}
                 </span>
@@ -124,43 +134,43 @@ export default function Banners() {
               {/* Text Layout Metadata Details Area */}
               <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
                 <div className="space-y-1.5">
-                  <h3 className="font-black text-base text-slate-800 tracking-tight leading-snug line-clamp-1 uppercase">
+                  <h3 className="font-black text-base text-slate-800 dark:text-slate-100 tracking-tight leading-snug line-clamp-1 uppercase">
                     {banner.title}
                   </h3>
-                  <p className="text-xs text-slate-500 font-medium line-clamp-2 leading-relaxed">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium line-clamp-2 leading-relaxed">
                     {banner.description}
                   </p>
                 </div>
 
                 {/* Metrics Highlights Section */}
-                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
-                  <div className="px-3 py-2 bg-slate-50 rounded-xl border border-slate-100">
-                    <span className="block text-sm font-black text-slate-800">{banner.stat1Number}</span>
-                    <span className="block text-[10px] text-slate-400 font-medium truncate">{banner.stat1Label}</span>
+                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100 dark:border-slate-800/80">
+                  <div className="px-3 py-2 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800">
+                    <span className="block text-sm font-black text-slate-800 dark:text-slate-200">{banner.stat1Number}</span>
+                    <span className="block text-[10px] text-slate-400 dark:text-slate-500 font-medium truncate">{banner.stat1Label}</span>
                   </div>
-                  <div className="px-3 py-2 bg-slate-50 rounded-xl border border-slate-100">
-                    <span className="block text-sm font-black text-slate-800">{banner.stat2Number}</span>
-                    <span className="block text-[10px] text-slate-400 font-medium truncate">{banner.stat2Label}</span>
+                  <div className="px-3 py-2 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800">
+                    <span className="block text-sm font-black text-slate-800 dark:text-slate-200">{banner.stat2Number}</span>
+                    <span className="block text-[10px] text-slate-400 dark:text-slate-500 font-medium truncate">{banner.stat2Label}</span>
                   </div>
                 </div>
 
                 {/* Target Redirect Preview Row */}
-                <div className="flex items-center justify-between text-[11px] bg-slate-50 border px-3 py-2 rounded-xl text-slate-500">
-                  <span className="font-semibold text-slate-600">Action: <span className="text-indigo-600 font-bold">{banner.ctaText}</span></span>
-                  <span className="font-mono text-slate-400 flex items-center gap-0.5">
+                <div className="flex items-center justify-between text-[11px] bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 px-3 py-2 rounded-xl text-slate-500 dark:text-slate-400">
+                  <span className="font-semibold text-slate-600 dark:text-slate-300">Action: <span className="text-indigo-600 dark:text-indigo-400 font-bold">{banner.ctaText}</span></span>
+                  <span className="font-mono text-slate-400 dark:text-slate-500 flex items-center gap-0.5">
                     {banner.ctaLink} <ArrowUpRight size={12} />
                   </span>
                 </div>
 
                 {/* VISIBLE CRITICAL CRUD ACTION TASK PANEL BUTTONS ROW */}
-                <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100">
+                <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 dark:border-slate-800/80">
                   <button
                     type="button"
                     onClick={() => toggleVisibility(banner._id, banner.isActive)}
-                    className={`flex items-center justify-center gap-1 py-2 rounded-xl text-xs font-bold border transition-colors ${
+                    className={`flex items-center justify-center gap-1 py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
                       banner.isActive 
-                        ? 'border-slate-200 text-slate-600 hover:bg-slate-50' 
-                        : 'border-indigo-200 bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
+                        ? 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900' 
+                        : 'border-indigo-200 dark:border-indigo-900/50 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/60'
                     }`}
                   >
                     {banner.isActive ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -170,7 +180,7 @@ export default function Banners() {
                   <button
                     type="button"
                     onClick={() => navigate(`/banners/edit/${banner._id}`)}
-                    className="flex items-center justify-center gap-1 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl text-xs font-bold transition-colors"
+                    className="flex items-center justify-center gap-1 py-2 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900 rounded-xl text-xs font-bold transition-colors cursor-pointer"
                   >
                     <Edit2 size={14} /> Edit
                   </button>
@@ -178,7 +188,7 @@ export default function Banners() {
                   <button
                     type="button"
                     onClick={() => handleDelete(banner._id)}
-                    className="flex items-center justify-center gap-1 py-2 border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-bold transition-colors"
+                    className="flex items-center justify-center gap-1 py-2 border border-rose-200 dark:border-rose-950/60 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl text-xs font-bold transition-colors cursor-pointer"
                   >
                     <Trash2 size={14} /> Delete
                   </button>

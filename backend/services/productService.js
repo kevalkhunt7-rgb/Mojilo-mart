@@ -10,8 +10,10 @@ class ProductService {
   async getProducts(queryParams) {
     const { page, limit, skip } = getPagination(queryParams);
     const { 
-      keyword, 
-      categoryId, 
+      keyword,
+      search,
+      categoryId,
+      category,
       tagId, 
       collectionId, 
       minPrice, 
@@ -22,8 +24,8 @@ class ProductService {
     } = queryParams;
 
     const { products, total } = await productRepository.searchProducts({
-      keyword,
-      categoryId,
+      keyword: keyword || search,
+      categoryId: categoryId || category,
       tagId,
       collectionId,
       minPrice,
@@ -49,8 +51,8 @@ class ProductService {
   async getProductBySlug(slugOrId) {
     let product;
 
-    // Search by ObjectId if valid
-    if (slugOrId && slugOrId.match(/^[0-9a-fA-F]{24}$/)) {
+    // Search by ObjectId if valid 24-char hex string
+    if (slugOrId && /^[0-9a-fA-F]{24}$/.test(slugOrId)) {
       product = await productRepository.findOne(
         { _id: slugOrId }, 
         'category tags collections variants'
@@ -90,8 +92,7 @@ class ProductService {
     }
 
     // Soft delete main product
-    product.isActive = false;
-    await product.save();
+    await productRepository.updateById(id, { isActive: false });
 
     // Disable all associated variants
     await ProductVariant.updateMany({ product: id }, { isActive: false });
@@ -110,7 +111,7 @@ class ProductService {
   }
 
   async getVariantsByProduct(productId) {
-    return await ProductVariant.find({ product: productId, isActive: true });
+    return await ProductVariant.find({ product: productId, isActive: true }).lean();
   }
 
   // --- Category Operations ---
@@ -128,7 +129,7 @@ class ProductService {
 
   // --- Tag & Collection Operations ---
   async getTags() {
-    return await Tag.find({ isActive: true });
+    return await Tag.find({ isActive: true }).lean();
   }
 
   async createTag(tagData) {
@@ -136,7 +137,7 @@ class ProductService {
   }
 
   async getCollections() {
-    return await Collection.find({ isActive: true });
+    return await Collection.find({ isActive: true }).lean();
   }
 
   async createCollection(collectionData) {

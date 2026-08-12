@@ -232,10 +232,9 @@ class PrintRenderService {
       logger.info(`Successfully finished production print generation for OrderItem: ${item._id}`);
     }
 
-    // Transition order state to 'Approved' artwork review once rendering finishes
-    order.orderStatus = 'approved';
+    // Record print rendering completion in status history without overwriting orderStatus
     order.statusHistory.push({
-      status: 'approved',
+      status: order.orderStatus || 'pending',
       notes: 'High-resolution production files and ZIP packages rendered successfully.',
       updatedBy: 'system'
     });

@@ -71,6 +71,21 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Google OAuth session
+  const googleLogin = async (idToken) => {
+    try {
+      const response = await api.post('/auth/google', { idToken });
+      const { user: userData, accessToken } = response.data.data;
+      
+      localStorage.setItem('mojilo_accessToken', accessToken);
+      setUser(userData);
+      return response.data;
+    } catch (error) {
+      const msg = error.response?.data?.message || 'Google authentication failed';
+      throw new Error(msg);
+    }
+  };
+
   // Logout session
   const logout = async () => {
     try {
@@ -89,6 +104,7 @@ export const AuthProvider = ({ children }) => {
       signup, 
       verifyEmailOtp, 
       login, 
+      googleLogin,
       logout, 
       isAuthenticated: !!user,
       loading 

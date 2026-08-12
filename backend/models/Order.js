@@ -49,7 +49,8 @@ const orderSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['COD', 'Online'],
+    enum: ['Online'],
+    default: 'Online',
     required: true,
   },
   paymentStatus: {
@@ -69,6 +70,7 @@ const orderSchema = new mongoose.Schema({
       'packed',
       'shipped',
       'delivered',
+      'cancellation_requested',
       'cancelled',
       'refunded'
     ],
@@ -110,9 +112,10 @@ const orderSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-orderSchema.index({ user: 1 });
-orderSchema.index({ orderNumber: 1 });
+orderSchema.index({ user: 1, createdAt: -1 });
 orderSchema.index({ orderStatus: 1 });
+orderSchema.index({ createdAt: -1 });
+orderSchema.index({ paymentStatus: 1, orderStatus: 1, createdAt: -1 });
 
 orderSchema.virtual('items', {
   ref: 'OrderItem',
@@ -121,7 +124,5 @@ orderSchema.virtual('items', {
 });
 
 const Order = mongoose.model('Order', orderSchema);
-
-Order.syncIndexes().catch((err) => console.warn('Order syncIndexes warning:', err.message));
 
 export default Order;

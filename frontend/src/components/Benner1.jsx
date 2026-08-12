@@ -6,13 +6,12 @@ export default function Banner1() {
   const navigate = useNavigate();
 
   return (
-    <section className="relative w-full bg-gradient-to-b from-[#D9A05B] to-[#403121] px-6 py-12 md:py-0 md:px-12 lg:px-24 flex flex-col md:flex-row items-center justify-between md:h-[400px]">
+    <section className="relative w-full bg-gradient-to-b from-[#D9A05B] to-[#403121] px-6 pt-10 pb-0 md:py-0 md:px-12 lg:px-24 flex flex-col md:flex-row items-center justify-center gap-6 md:gap-12 min-h-[400px]">
       
       {/* LEFT CONTENT COLUMN */}
-      {/* Added text-center and items-center for small screens; md: overrides these for desktop */}
-      <div className="w-full md:w-3/5 flex flex-col items-center md:items-start justify-center h-full z-10 space-y-6 text-white text-center md:text-left">
+      <div className="w-full md:w-auto flex flex-col items-center md:items-start justify-center z-10 space-y-4 sm:space-y-6 text-white text-center md:text-left pt-2 md:pt-0">
         <div className="relative max-w-xl">
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-wide uppercase leading-tight">
+          <h2 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-wide uppercase leading-tight drop-shadow-md">
             Positive Mind Positive <br className="hidden md:block" />
             Vibes Positive Life
           </h2>
@@ -24,27 +23,33 @@ export default function Banner1() {
           </div>
         </div>
 
-        <p className="text-gray-200 text-sm sm:text-base font-normal tracking-wide">
+        <p className="text-gray-200 text-xs sm:text-base font-normal tracking-wide">
           T-shirts that keep you moving.
         </p>
 
-        <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 pt-2">
-          <button onClick={() => navigate('/collection')} className="bg-black hover:bg-gray-900 text-white font-bold px-8 py-3.5 rounded-lg text-sm transition-colors duration-200 shadow-lg tracking-wide cursor-pointer">
+        <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 sm:gap-4 pt-2">
+          <button 
+            onClick={() => navigate('/collection')} 
+            className="bg-black hover:bg-gray-900 text-white font-bold px-6 sm:px-8 py-3 sm:py-3.5 rounded-lg text-xs sm:text-sm transition-all duration-300 ease-out transform hover:scale-105 active:scale-95 shadow-lg tracking-wide cursor-pointer"
+          >
             Shop Now
           </button>
-          <button onClick={() => navigate('/contact-us')} className="bg-white hover:bg-gray-100 text-black font-bold px-8 py-3.5 rounded-lg text-sm transition-colors duration-200 shadow-lg tracking-wide cursor-pointer">
+          <button 
+            onClick={() => navigate('/contact-us')} 
+            className="bg-white hover:bg-gray-100 text-black font-bold px-6 sm:px-8 py-3 sm:py-3.5 rounded-lg text-xs sm:text-sm transition-all duration-300 ease-out transform hover:scale-105 active:scale-95 shadow-lg tracking-wide cursor-pointer"
+          >
             Contact Us
           </button>
         </div>
       </div>
 
       {/* RIGHT IMAGE COLUMN */}
-      <div className="w-full md:w-2/5 h-full relative flex justify-center md:justify-end items-end mt-8 md:mt-0">
-        <div className="relative w-full max-w-[360px] md:max-w-[420px] h-[85%] md:h-[95%] flex items-end">
+      <div className="w-full md:w-auto relative flex justify-center md:justify-start items-end z-20 mt-4 md:mt-0">
+        <div className="relative w-full max-w-[280px] sm:max-w-[360px] md:max-w-[460px] flex items-end">
           <img 
             src={BennerMan}
             alt="Fitness model featuring Positive Mind T-shirt" 
-            className="w-full md:w-[450px] h-auto md:h-[450px] object-contain object-bottom drop-shadow-[0_20px_20px_rgba(0,0,0,0.4)]"
+            className="w-full h-auto object-contain object-bottom mt-0 md:-mt-16 mb-0 drop-shadow-[0_15px_15px_rgba(0,0,0,0.4)] transition-transform duration-500 ease-out hover:scale-105"
           />
         </div>
       </div>

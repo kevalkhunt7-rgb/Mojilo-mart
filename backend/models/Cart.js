@@ -66,6 +66,7 @@ const cartSchema = new mongoose.Schema({
 
 cartSchema.index({ user: 1 });
 cartSchema.index({ sessionId: 1 });
+cartSchema.index({ user: 1, updatedAt: 1 });
 
 const Cart = mongoose.model('Cart', cartSchema);
 

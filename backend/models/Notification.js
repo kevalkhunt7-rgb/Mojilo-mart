@@ -22,6 +22,10 @@ const notificationSchema = new mongoose.Schema({
   isRead: {
     type: Boolean,
     default: false,
+  },
+  sku: {
+    type: String,
+    default: null,
   }
 }, {
   timestamps: true,
@@ -29,6 +33,7 @@ const notificationSchema = new mongoose.Schema({
 
 notificationSchema.index({ user: 1 });
 notificationSchema.index({ isRead: 1 });
+notificationSchema.index({ type: 1, sku: 1, isRead: 1 });
 
 const Notification = mongoose.model('Notification', notificationSchema);
 

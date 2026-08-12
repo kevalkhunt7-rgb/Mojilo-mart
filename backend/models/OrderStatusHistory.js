@@ -9,15 +9,14 @@ const orderStatusHistorySchema = new mongoose.Schema({
   status: {
     type: String,
     enum: [
-      'pending', 
-      'confirmed', 
-      'printing', 
-      'quality_check', 
-      'packed', 
-      'shipped', 
-      'delivered', 
-      'cancelled', 
-      'refunded'
+      'pending',
+      'confirmed',
+      'printing',
+      'packed',
+      'shipped',
+      'delivered',
+      'cancelled',
+
     ],
     required: true,
   },

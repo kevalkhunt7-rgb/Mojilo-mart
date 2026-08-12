@@ -20,3 +20,4 @@ body {
   mix-blend-mode: multiply;
   pointer-events: none; /* Allows user to drag canvas items underneath the overlay safely */
 }
+

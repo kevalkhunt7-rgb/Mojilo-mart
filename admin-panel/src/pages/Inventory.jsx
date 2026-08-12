@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import api from '../lib/axios';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { Search, Plus, Warehouse as WarehouseIcon, AlertTriangle, CheckCircle, Package, RefreshCcw, Landmark } from 'lucide-react';
@@ -23,7 +23,7 @@ const Inventory = () => {
 
   const fetchWarehouses = async () => {
     try {
-      const res = await axios.get('/api/inventory/warehouses', { withCredentials: true });
+      const res = await api.get('/inventory/warehouses');
       const list = res.data?.data || [];
       setWarehouses(list);
       if (list.length > 0) {
@@ -38,7 +38,7 @@ const Inventory = () => {
     if (!warehouseId) return;
     setLoadingStock(true);
     try {
-      const res = await axios.get(`/api/inventory/stock?warehouseId=${warehouseId}`, { withCredentials: true });
+      const res = await api.get(`/inventory/stock?warehouseId=${warehouseId}`);
       setStockList(res.data?.data || []);
     } catch (err) {
       toast.error('Failed to load warehouse stock levels');
@@ -50,7 +50,7 @@ const Inventory = () => {
   const fetchAlerts = async () => {
     setLoadingAlerts(true);
     try {
-      const res = await axios.get('/api/inventory/alerts', { withCredentials: true });
+      const res = await api.get('/inventory/alerts');
       setAlerts(res.data?.data || []);
     } catch (err) {
       console.error('Failed to load low-stock alerts', err);
@@ -79,7 +79,7 @@ const Inventory = () => {
     };
 
     try {
-      await axios.post('/api/inventory/restock', payload, { withCredentials: true });
+      await api.post('/inventory/restock', payload);
       toast.success('Inventory restocked successfully!');
       setIsRestockModalOpen(false);
       

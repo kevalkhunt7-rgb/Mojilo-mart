@@ -39,7 +39,7 @@ class PaymentService {
         orderId: razorpayOrder.id,
         amount: razorpayOrder.amount,
         currency: razorpayOrder.currency,
-        key: process.env.RAZORPAY_KEY_ID || 'rzp_test_mockkey'
+        key: process.env.RAZORPAY_KEY_ID ? process.env.RAZORPAY_KEY_ID.trim() : 'rzp_test_mockkey'
       };
     } catch (error) {
       logger.error('Razorpay Order Creation Error:', error);
@@ -49,7 +49,7 @@ class PaymentService {
 
   async verifyPaymentSignature({ orderId, razorpayOrderId, razorpayPaymentId, razorpaySignature }) {
     const text = razorpayOrderId + '|' + razorpayPaymentId;
-    const secret = process.env.RAZORPAY_KEY_SECRET || 'your_secret';
+    const secret = process.env.RAZORPAY_KEY_SECRET ? process.env.RAZORPAY_KEY_SECRET.trim() : 'your_secret';
     
     const generatedSignature = crypto
       .createHmac('sha256', secret)

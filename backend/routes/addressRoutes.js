@@ -15,6 +15,7 @@ router.use(protect);
 
 router.get('/', getAddresses);
 router.post('/', addressRules, validate, addAddress);
+router.put('/:id', addressRules, validate, updateAddress);
 router.patch('/:id', addressRules, validate, updateAddress);
 router.delete('/:id', deleteAddress);
 

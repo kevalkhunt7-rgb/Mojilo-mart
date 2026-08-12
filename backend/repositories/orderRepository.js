@@ -1,18 +1,89 @@
 import mongoose from 'mongoose';
 import BaseRepository from './baseRepository.js';
 import Order from '../models/Order.js';
+import User from '../models/User.js';
+import OrderItem from '../models/OrderItem.js';
+import Product from '../models/Product.js';
+import Customization from '../models/Customization.js';
 
 class OrderRepository extends BaseRepository {
   constructor() {
     super(Order);
   }
 
-  async populateOrdersHelper(orders) {
+  async getOrdersList({ skip = 0, limit = 20 }) {
+    // 1. Fetch orders list
+    const [orders, total] = await Promise.all([
+      Order.find({})
+        .select('orderNumber user totalAmount paymentStatus orderStatus createdAt shippingAddress')
+        .populate('user', 'name email')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Order.countDocuments({})
+    ]);
+
+    if (orders.length === 0) {
+      return { orders: [], total: 0 };
+    }
+
+    const orderIds = orders.map(o => o._id);
+    const OrderItem = mongoose.model('OrderItem');
+
+    // 2. Fetch OrderItems and populate lightweight product/variant image references
+    const items = await OrderItem.find({ order: { $in: orderIds } })
+      .select('order productName quantity price color size variantDescription image imageUrl decalUrl previewUrl customization product productVariant')
+      .populate('product', 'image imageUrl images')
+      .populate('productVariant', 'image imageUrl images')
+      .lean();
+
+    const itemsMap = new Map();
+    items.forEach(item => {
+      // Resolve image from OrderItem snapshot -> Product -> ProductVariant
+      const prodImg = item.product?.image || item.product?.imageUrl || item.product?.images?.[0]?.url || (typeof item.product?.images?.[0] === 'string' ? item.product?.images?.[0] : null);
+      const variantImg = item.productVariant?.image || item.productVariant?.imageUrl || item.productVariant?.images?.[0]?.url || (typeof item.productVariant?.images?.[0] === 'string' ? item.productVariant?.images?.[0] : null);
+      
+      const listImage = item.decalUrl || item.previewUrl || item.image || item.imageUrl || prodImg || variantImg || null;
+      
+      if (listImage) {
+        item.image = item.image || listImage;
+        item.customization = {
+          decalUrl: listImage,
+          previewUrl: listImage,
+          previews: { front: listImage }
+        };
+      }
+
+      const oId = item.order.toString();
+      if (!itemsMap.has(oId)) itemsMap.set(oId, []);
+      itemsMap.get(oId).push(item);
+    });
+
+    orders.forEach(order => {
+      order.items = itemsMap.get(order._id.toString()) || [];
+      if (order.items.length > 0) {
+        const itemsTotal = order.items.reduce((sum, it) => sum + ((it.price || 0) * (it.quantity || 1)), 0);
+        if (itemsTotal > 0) {
+          order.totalAmount = itemsTotal;
+          if (order.pricingSummary) {
+            order.pricingSummary.subtotal = itemsTotal;
+            order.pricingSummary.grandTotal = Math.max(0, itemsTotal - (order.pricingSummary.discount || 0));
+          }
+        }
+      }
+    });
+
+    return { orders, total };
+  }
+
+  async populateOrdersHelper(orders, options = {}) {
     if (!orders) return orders;
     const isArray = Array.isArray(orders);
     const orderDocs = isArray ? orders.filter(Boolean) : [orders].filter(Boolean);
     if (orderDocs.length === 0) return orders;
 
+    const { includeFullCanvas = false } = options;
     const orderIds = orderDocs.map(o => o._id);
 
     const OrderItem = mongoose.model('OrderItem');
@@ -21,10 +92,8 @@ class OrderRepository extends BaseRepository {
     const Customization = mongoose.model('Customization');
     const Layer = mongoose.model('Layer');
 
-    // Batch 1: Fetch all OrderItems for these orders in one query
     const allOrderItems = await OrderItem.find({ order: { $in: orderIds } }).lean();
 
-    // Extract unique product, variant, and customization IDs
     const productIds = [];
     const variantIds = [];
     const customizationIds = [];
@@ -49,15 +118,19 @@ class OrderRepository extends BaseRepository {
       }
     });
 
-    // Batch 2: Fetch Products, Variants, Customizations, and Layers using $in
+    const custQuery = customizationIds.length > 0
+      ? (includeFullCanvas
+        ? Customization.find({ _id: { $in: customizationIds } }).lean()
+        : Customization.find({ _id: { $in: customizationIds } }).select('-canvasJSON -editableDesignJSON').lean())
+      : Promise.resolve([]);
+
     const [products, variants, customizations, layers] = await Promise.all([
       productIds.length > 0 ? Product.find({ _id: { $in: productIds } }).lean() : [],
       variantIds.length > 0 ? ProductVariant.find({ _id: { $in: variantIds } }).lean() : [],
-      customizationIds.length > 0 ? Customization.find({ _id: { $in: customizationIds } }).lean() : [],
+      custQuery,
       customizationIds.length > 0 ? Layer.find({ customizationId: { $in: customizationIds } }).lean() : []
     ]);
 
-    // Create lookup maps for fast O(1) matching
     const productMap = new Map(products.map(p => [p._id.toString(), p]));
     const variantMap = new Map(variants.map(v => [v._id.toString(), v]));
     const customizationMap = new Map(customizations.map(c => [c._id.toString(), c]));
@@ -71,18 +144,19 @@ class OrderRepository extends BaseRepository {
       }
     });
 
-    // Process and attach populated data to order items
     const itemsByOrderMap = new Map();
 
     allOrderItems.forEach(item => {
-      // 1. Product resolution
       if (item.product && productMap.has(item.product.toString())) {
         item.product = productMap.get(item.product.toString());
       } else {
         item.product = { name: item.productName || 'Custom Template Item' };
       }
 
-      // 2. Variant resolution
+      const prodImg = (typeof item.product === 'object' && item.product !== null)
+        ? (item.product.image || item.product.imageUrl || (Array.isArray(item.product.images) ? (item.product.images[0]?.url || item.product.images[0]) : null))
+        : null;
+
       if (item.productVariant && variantMap.has(item.productVariant.toString())) {
         item.productVariant = variantMap.get(item.productVariant.toString());
       } else {
@@ -91,7 +165,6 @@ class OrderRepository extends BaseRepository {
         };
       }
 
-      // 3. Customization resolution & Synthetic Fallback
       let targetIdStr = null;
       if (item.customization) {
         if (mongoose.Types.ObjectId.isValid(item.customization)) {
@@ -108,7 +181,15 @@ class OrderRepository extends BaseRepository {
       const itemLayers = targetIdStr ? (layerMap.get(targetIdStr) || []) : [];
 
       if (custDoc) {
-        // Real Customization document found
+        const hasRealCustomData = Boolean(
+          itemLayers.length > 0 ||
+          (custDoc.editableDesignJSON && typeof custDoc.editableDesignJSON === 'object' && Object.keys(custDoc.editableDesignJSON).length > 0) ||
+          (custDoc.canvasJSON && typeof custDoc.canvasJSON === 'object' && Object.keys(custDoc.canvasJSON).length > 0) ||
+          custDoc.isCustomDesign === true ||
+          item.isCustomTemplate === true ||
+          item.productName === 'Custom Template Item'
+        );
+        item.isCustomized = hasRealCustomData;
         let frontImg = custDoc.decalUrl || custDoc.previewUrl || custDoc.previews?.front || custDoc.previews?.mockup;
 
         if (!frontImg && itemLayers.length > 0) {
@@ -120,28 +201,13 @@ class OrderRepository extends BaseRepository {
           }
         }
 
-        if (!frontImg && custDoc.editableDesignJSON) {
-          try {
-            const design = typeof custDoc.editableDesignJSON === 'string' ? JSON.parse(custDoc.editableDesignJSON) : custDoc.editableDesignJSON;
-            if (typeof design === 'object' && design !== null) {
-              for (const view of Object.keys(design)) {
-                const objs = Array.isArray(design[view]) ? design[view] : (design[view]?.objects || []);
-                for (const obj of objs) {
-                  if (obj && (obj.src || obj.url)) {
-                    frontImg = obj.src || obj.url;
-                    break;
-                  }
-                }
-                if (frontImg) break;
-              }
-            }
-          } catch (e) {}
-        }
-
-        if (!frontImg) frontImg = item.image || item.imageUrl || null;
+        if (!frontImg) frontImg = item.decalUrl || item.previewUrl || item.image || item.imageUrl || prodImg || null;
 
         const custColor = custDoc.selectedColor || custDoc.color || item.color || '#FFFFFF';
         item.color = custColor;
+        item.decalUrl = hasRealCustomData ? frontImg : null;
+        item.previewUrl = frontImg;
+        item.image = frontImg || item.image || prodImg;
 
         item.customization = {
           ...custDoc,
@@ -149,33 +215,44 @@ class OrderRepository extends BaseRepository {
           selectedColor: custColor,
           decalUrl: frontImg,
           previewUrl: frontImg,
-          previews: {
-            front: frontImg,
-            ...(custDoc.previews || {})
-          },
+          previews: { front: frontImg, ...(custDoc.previews || {}) },
           layers: itemLayers
         };
       } else {
-        // Synthetic Fallback: Construct customization object directly from OrderItem fields
         const rawCustObj = typeof item.customization === 'object' && item.customization !== null ? item.customization : {};
+        const hasRealCustomData = Boolean(
+          (rawCustObj.editableDesignJSON && typeof rawCustObj.editableDesignJSON === 'object' && Object.keys(rawCustObj.editableDesignJSON).length > 0) ||
+          (rawCustObj.canvasJSON && typeof rawCustObj.canvasJSON === 'object' && Object.keys(rawCustObj.canvasJSON).length > 0) ||
+          (Array.isArray(rawCustObj.layers) && rawCustObj.layers.length > 0) ||
+          rawCustObj.isCustomDesign === true ||
+          item.isCustomTemplate === true ||
+          item.productName === 'Custom Template Item'
+        );
+        item.isCustomized = hasRealCustomData;
+
         const fallbackColor = rawCustObj.selectedColor || rawCustObj.color || item.color || '#FFFFFF';
-        const fallbackImg = rawCustObj.decalUrl || rawCustObj.previewUrl || rawCustObj.image || item.decalUrl || item.previewUrl || item.image || item.imageUrl || null;
+        const fallbackImg = rawCustObj.decalUrl || rawCustObj.previewUrl || rawCustObj.image || item.decalUrl || item.previewUrl || item.image || item.imageUrl || prodImg || null;
 
         item.color = fallbackColor;
-        item.customization = {
-          _id: targetIdStr || item._id,
-          ...rawCustObj,
-          color: fallbackColor,
-          selectedColor: fallbackColor,
-          decalUrl: fallbackImg,
-          previewUrl: fallbackImg,
-          previews: {
-            front: fallbackImg,
-            ...(rawCustObj.previews || {})
-          },
-          clothingType: item.productName || 'Custom Garment',
-          layers: []
-        };
+        item.decalUrl = hasRealCustomData ? fallbackImg : null;
+        item.previewUrl = fallbackImg;
+        item.image = fallbackImg || item.image || prodImg;
+
+        if (hasRealCustomData) {
+          item.customization = {
+            _id: targetIdStr || item._id,
+            ...rawCustObj,
+            color: fallbackColor,
+            selectedColor: fallbackColor,
+            decalUrl: fallbackImg,
+            previewUrl: fallbackImg,
+            previews: { front: fallbackImg, ...(rawCustObj.previews || {}) },
+            clothingType: item.productName || 'Custom Garment',
+            layers: []
+          };
+        } else {
+          item.customization = null;
+        }
       }
 
       const oId = item.order.toString();
@@ -192,17 +269,32 @@ class OrderRepository extends BaseRepository {
 
   async findByUserId(userId) {
     const orders = await Order.find({ user: userId })
+      .select('orderNumber totalAmount paymentStatus orderStatus createdAt shippingAddress discountAmount pricingSummary subTotal')
       .sort({ createdAt: -1 })
       .lean();
-    return await this.populateOrdersHelper(orders);
+
+    if (!orders || orders.length === 0) return [];
+
+    const populated = await this.populateOrdersHelper(orders, { includeFullCanvas: true });
+    return populated;
   }
 
   async findWithDetails(orderId) {
-    const order = await Order.findById(orderId)
-      .populate('shippingMethod')
-      .lean();
+    let order = null;
+    if (mongoose.Types.ObjectId.isValid(orderId)) {
+      order = await Order.findById(orderId)
+        .populate('user', 'name email')
+        .populate('shippingMethod')
+        .lean();
+    }
+    if (!order) {
+      order = await Order.findOne({ orderNumber: orderId })
+        .populate('user', 'name email')
+        .populate('shippingMethod')
+        .lean();
+    }
     if (!order) return null;
-    const populated = await this.populateOrdersHelper([order]);
+    const populated = await this.populateOrdersHelper([order], { includeFullCanvas: true });
     return populated[0];
   }
 
@@ -211,7 +303,7 @@ class OrderRepository extends BaseRepository {
       .populate('shippingMethod')
       .lean();
     if (!order) return null;
-    const populated = await this.populateOrdersHelper([order]);
+    const populated = await this.populateOrdersHelper([order], { includeFullCanvas: true });
     return populated[0];
   }
 
@@ -239,4 +331,3 @@ class OrderRepository extends BaseRepository {
 }
 
 export default new OrderRepository();
-

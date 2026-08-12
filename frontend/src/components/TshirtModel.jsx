@@ -97,7 +97,7 @@ export function TshirtModel({
               <Decal
                 position={[0, 0.2, -0.31]}
                 rotation={[-Math.PI / 2 - 0.05, 0, 0]}
-                scale={[0.52, 0.7, 0.5]}
+                scale={[0.60, 0.9, 0.5]}
                 onClick={() => onViewChange("front")}
               >
                 <meshStandardMaterial
@@ -123,7 +123,7 @@ export function TshirtModel({
               <Decal
                 position={[0, -0.2, -0.27]}
                 rotation={[Math.PI / 2 - 0.2, 0, Math.PI]}
-                scale={[0.52, 0.7, 0.5]}
+                scale={[0.60, 0.9, 0.5]}
                 onClick={() => onViewChange("back")}
               >
                 <meshStandardMaterial

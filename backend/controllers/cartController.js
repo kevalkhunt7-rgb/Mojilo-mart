@@ -22,6 +22,7 @@ export const addToCart = asyncHandler(async (req, res) => {
     quantity,
     color,
     size,
+    price,
     customizationId: directCustomizationId,
     customizationData,
   } = req.body;
@@ -30,6 +31,7 @@ export const addToCart = asyncHandler(async (req, res) => {
   const resolvedCustomizationId = directCustomizationId || customizationData?.customizationId || null;
   const resolvedColor  = color  || customizationData?.selectedColor || customizationData?.color || null;
   const resolvedSize   = size   || customizationData?.selectedSize  || customizationData?.size  || null;
+  const resolvedPrice  = price !== undefined && price !== null && price !== '' ? Number(price) : (customizationData?.price ? Number(customizationData.price) : null);
 
   const cart = await cartService.addCustomizedProduct(
     { userId: req.user ? req.user._id : null, sessionId },
@@ -39,6 +41,7 @@ export const addToCart = asyncHandler(async (req, res) => {
       customizationId: resolvedCustomizationId,
       color:           resolvedColor,
       size:            resolvedSize,
+      price:           resolvedPrice,
       quantity:        quantity || 1,
     }
   );

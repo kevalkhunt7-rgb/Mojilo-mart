@@ -3,7 +3,10 @@ import ApiResponse from '../utils/ApiResponse.js';
 import asyncHandler from '../utils/asyncHandler.js';
 
 export const getCustomization = asyncHandler(async (req, res) => {
-  const result = await customizationService.getCustomizationDetails(req.params.id);
+  // Check if caller requests excluding heavy canvas data (e.g. ?excludeCanvas=true)
+  const excludeCanvas = req.query.excludeCanvas === 'true';
+
+  const result = await customizationService.getCustomizationDetails(req.params.id, { excludeCanvas });
   res.status(200).json(new ApiResponse(200, result, 'Customization details retrieved'));
 });
 

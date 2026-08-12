@@ -96,7 +96,7 @@ export function OversizedModel({
                       <Decal
                         position={[0, -0.14, 1.28]}
                         rotation={[Math.PI / 2, 0, 0]}
-                        scale={[0.58, 0.68, 0.22]}
+                        scale={[0.8, 1, 0.22]}
                         onClick={() => handleClick("front")}
                       >
                         <meshStandardMaterial
@@ -115,7 +115,7 @@ export function OversizedModel({
                       <Decal
                         position={[0, 0.14, 1.28]}
                         rotation={[-Math.PI / 2, 0, Math.PI]}
-                        scale={[0.58, 0.68, 0.22]}
+                        scale={[0.8, 1, 0.22]}
                         onClick={() => handleClick("back")}
                       >
                         <meshStandardMaterial

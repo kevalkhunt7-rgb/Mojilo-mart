@@ -46,7 +46,7 @@ This document outlines the main API endpoints for the Mojilo backend application
 
 | Endpoint | Method | Auth Required | Description |
 | :--- | :--- | :--- | :--- |
-| `/api/orders` | POST | Customer | Place order (COD or Online). |
+| `/api/orders` | POST | Customer | Place order (Online Payment). |
 | `/api/orders/:id`| GET | Customer | Fetch order timeline details and invoice ID. |
 | `/api/payments/create-order`| POST | Customer | Create Razorpay checkout order ID. |
 | `/api/payments/verify-signature`| POST| Customer | Validate Razorpay signature hashes. |

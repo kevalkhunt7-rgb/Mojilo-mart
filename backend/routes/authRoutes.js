@@ -6,7 +6,8 @@ import {
   logout,
   verifyEmail,
   forgotPassword,
-  resetPassword
+  resetPassword,
+  googleLogin
 } from '../controllers/authController.js';
 import {
   registerRules,
@@ -22,6 +23,7 @@ const router = express.Router();
 
 router.post('/register', authLimiter, registerRules, validate, register);
 router.post('/login', authLimiter, loginRules, validate, login);
+router.post('/google', googleLogin);
 router.post('/refresh', refresh);
 router.post('/logout', logout);
 router.post('/verify-email', emailVerificationRules, validate, verifyEmail);

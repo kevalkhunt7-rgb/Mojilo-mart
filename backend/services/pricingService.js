@@ -1,6 +1,7 @@
 /**
  * Decoupled Pricing Engine Service for Customized Products
  */
+import { calculateCustomizationCost } from '../utils/calculatePrice.js';
 
 /**
  * Calculate the base price of the product variant
@@ -108,11 +109,16 @@ export const getGrandTotal = ({
  */
 export const calculatePrice = ({ customization, variant, quantity = 1 }) => {
   const prod = variant?.product;
-  const effectiveProductPrice = (prod?.salePrice && Number(prod.salePrice) > 0)
-    ? Number(prod.salePrice)
-    : ((prod?.price && Number(prod.price) > 0)
-        ? Number(prod.price)
-        : Number(prod?.basePrice || 0));
+  const explicitVariantPrice = variant?.price && !isNaN(Number(variant.price)) && Number(variant.price) > 0
+    ? Number(variant.price)
+    : null;
+  const effectiveProductPrice = explicitVariantPrice !== null
+    ? explicitVariantPrice
+    : (prod?.salePrice && Number(prod.salePrice) > 0)
+      ? Number(prod.salePrice)
+      : ((prod?.price && Number(prod.price) > 0)
+          ? Number(prod.price)
+          : Number(prod?.basePrice || 0));
 
   const basePrice = getBaseProductPrice(effectiveProductPrice, 0);
   
@@ -145,12 +151,17 @@ export const calculatePrice = ({ customization, variant, quantity = 1 }) => {
     Object.entries(layersByView).forEach(([viewKey, objects]) => {
       if (!objects || objects.length === 0) return;
 
+      const printableObjects = objects.filter((obj) => {
+        if (!obj || obj.visible === false) return false;
+        if (obj.isBackground || obj.isOverlay || obj.isHelper || obj.isGrid || obj.isPrintAreaBox) return false;
+        return (obj.width || 0) > 0 && (obj.height || 0) > 0;
+      });
+
+      if (printableObjects.length === 0) return;
+
       activeViewsCount++;
 
-      let viewAreaPx = 0;
-
-      objects.forEach((obj) => {
-        // Classify layer types for extra flat fees if configured
+      printableObjects.forEach((obj) => {
         if (obj.type === 'Text') {
           textCost += costPerText;
         } else {
@@ -161,18 +172,11 @@ export const calculatePrice = ({ customization, variant, quantity = 1 }) => {
             imageCost += costPerUpload;
           }
         }
-
-        const w = obj.width || 0;
-        const h = obj.height || 0;
-        viewAreaPx += w * h;
       });
 
-      // Calculate total area cost for this side
-      const sqInches = viewAreaPx / (PX_PER_INCH * PX_PER_INCH);
-      const calculatedAreaCost = sqInches * RATE_PER_SQ_INCH;
-
-      // Enforce the ₹30 Minimum Rule per view
-      areaCost += Math.max(MINIMUM_VIEW_PRINT_COST, calculatedAreaCost);
+      // Calculate area cost per individual element using calculateCustomizationCost
+      const viewAreaCost = calculateCustomizationCost(printableObjects);
+      areaCost += viewAreaCost;
     });
   }
 

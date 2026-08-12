@@ -4,7 +4,58 @@ import ConfirmationModal from '../components/ConfirmationModal';
 import { useNavigate } from 'react-router-dom';
 import { ShoppingBag, Tag, Trash2, ChevronRight } from 'lucide-react';
 import api from '../lib/axios';
-import  CartItem3DViewer  from '../components/CartItem3DViewer';
+import CartItem3DViewer from '../components/CartItem3DViewer';
+
+const formatPrice = (val) => {
+  const num = Number(val || 0);
+  if (isNaN(num)) return '0';
+  return Number.isInteger(num) ? num.toString() : num.toFixed(2);
+};
+
+const getItemPrice = (item) => {
+  if (!item) return 0;
+
+  // 1. Direct item unit price stored on cart item (explicit dynamic size price passed during addToCart)
+  if (typeof item.price === 'number' && !isNaN(item.price) && item.price > 0) {
+    return Math.round(item.price * 100) / 100;
+  }
+
+  // 2. Custom template items carry their total calculated unit price in totalItemPrice or product.calculatedPrice
+  if (item.isCustomTemplate || item.customizationId || item.customization) {
+    if (typeof item.totalItemPrice === 'number' && !isNaN(item.totalItemPrice) && item.totalItemPrice > 0) {
+      return Math.round((item.totalItemPrice / (item.quantity || 1)) * 100) / 100;
+    }
+    if (typeof item.product?.calculatedPrice === 'number' && !isNaN(item.product.calculatedPrice) && item.product.calculatedPrice > 0) {
+      return Math.round(item.product.calculatedPrice * 100) / 100;
+    }
+  }
+
+  // 3. Match size-specific price in product.sizes array if available
+  const prod = item.product;
+  if (prod && typeof prod === 'object' && item.size && Array.isArray(prod.sizes)) {
+    const matchedSize = prod.sizes.find((s) => (typeof s === 'object' ? s.size : s) === item.size);
+    if (matchedSize && typeof matchedSize === 'object' && matchedSize.price != null && matchedSize.price !== '') {
+      const szPrice = Number(matchedSize.price);
+      if (!isNaN(szPrice) && szPrice > 0) return szPrice;
+    }
+  }
+
+  // 4. Variant price override
+  const varPrice = Number(item.variant?.price);
+  if (!isNaN(varPrice) && varPrice > 0) return varPrice;
+
+  // 5. Parent product default sale/base price fallbacks
+  if (prod && typeof prod === 'object') {
+    const sale = Number(prod.salePrice);
+    if (!isNaN(sale) && sale > 0) return sale;
+    const price = Number(prod.price);
+    if (!isNaN(price) && price > 0) return price;
+    const base = Number(prod.basePrice);
+    if (!isNaN(base) && base > 0) return base;
+  }
+
+  return 0;
+};
 
 const CartPage = () => {
   const { cart, updateQuantity, removeFromCart, fetchCart, appliedCoupon, applyCoupon, removeCoupon } = useCart();
@@ -46,7 +97,7 @@ const CartPage = () => {
   };
 
   const subtotal = cart.reduce((acc, item) => {
-    const itemPrice = item.price || item.variant?.price || item.product?.basePrice || 0;
+    const itemPrice = getItemPrice(item);
     return acc + itemPrice * (item.quantity || 1);
   }, 0);
 
@@ -126,7 +177,9 @@ const CartPage = () => {
               const displaySize = item.selectedSize || item.size || item.variant?.size;
               const colorObj = item.selectedColor || item.color || item.variant?.color;
               const displayColorName = typeof colorObj === 'object' ? colorObj?.name : colorObj;
-              const itemPrice = item.price || item.variant?.price || item.product?.basePrice || 0;
+              const itemPrice = getItemPrice(item);
+              const originalBasePrice = Number(item.product?.basePrice || item.variant?.basePrice || 0);
+              const hasDiscount = originalBasePrice > itemPrice;
 
               return (
                 <div
@@ -166,7 +219,14 @@ const CartPage = () => {
 
                       {/* Price + remove row */}
                       <div className="flex items-center justify-between pt-0.5">
-                        <span className="text-sm font-semibold text-slate-900">₹{itemPrice}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-slate-900">₹{formatPrice(itemPrice)}</span>
+                          {hasDiscount && (
+                            <span className="text-xs text-slate-400 line-through">
+                              ₹{formatPrice(originalBasePrice)}
+                            </span>
+                          )}
+                        </div>
                         <button
                           onClick={() => handleRemoveClick(uid, item.isCustomTemplate)}
                           className="text-rose-400 hover:text-rose-600 transition-colors p-1 cursor-pointer"
@@ -183,7 +243,7 @@ const CartPage = () => {
                           onDecrease={() => handleQuantityChange(uid, -1, item.quantity, item.isCustomTemplate)}
                           onIncrease={() => handleQuantityChange(uid, +1, item.quantity, item.isCustomTemplate)}
                         />
-                        <span className="text-sm font-bold text-slate-900">₹{itemPrice * item.quantity}</span>
+                        <span className="text-sm font-bold text-slate-900">₹{formatPrice(itemPrice * item.quantity)}</span>
                       </div>
                     </div>
                   </div>
@@ -223,7 +283,14 @@ const CartPage = () => {
                     </div>
 
                     {/* Price */}
-                    <div className="text-sm font-medium text-slate-700">₹{itemPrice}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-slate-900">₹{formatPrice(itemPrice)}</span>
+                      {hasDiscount && (
+                        <span className="text-xs text-slate-400 line-through">
+                          ₹{formatPrice(originalBasePrice)}
+                        </span>
+                      )}
+                    </div>
 
                     {/* Qty */}
                     <div className="flex justify-center">
@@ -235,7 +302,7 @@ const CartPage = () => {
                     </div>
 
                     {/* Subtotal */}
-                    <div className="text-sm font-bold text-slate-900 text-right">₹{itemPrice * item.quantity}</div>
+                    <div className="text-sm font-bold text-slate-900 text-right">₹{formatPrice(itemPrice * item.quantity)}</div>
                   </div>
                 </div>
               );
@@ -253,60 +320,8 @@ const CartPage = () => {
 
           </div>
 
-          {/* ── Bottom grid: Coupon + Order total ──────────────────────── */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4">
-
-            {/* Coupon */}
-            <div className="bg-white border border-slate-100 rounded-2xl p-5 sm:p-6 shadow-xs">
-              <div className="flex items-center gap-2 mb-1">
-                <Tag className="w-4 h-4 text-[#a47a4c]" />
-                <h5 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Coupon Code</h5>
-              </div>
-              <p className="text-xs text-slate-400 mb-4">Apply store coupons for dynamic discount adjustments.</p>
-
-              <form onSubmit={handleApplyCoupon} className="flex flex-col xs:flex-row gap-2">
-                <input
-                  type="text"
-                  placeholder="Enter code"
-                  value={couponInput}
-                  onChange={(e) => {
-                    setCouponInput(e.target.value.toUpperCase());
-                    setCouponStatus(null);
-                  }}
-                  className={`flex-1 bg-slate-50 border rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:bg-white transition-all
-                        ${couponStatus === 'error' ? 'border-rose-300 focus:border-rose-400 focus:ring-2 focus:ring-rose-100' :
-                      couponStatus === 'success' ? 'border-emerald-300 focus:border-emerald-400' :
-                        'border-slate-200 focus:border-[#a47a4c] focus:ring-4 focus:ring-[#a47a4c]/5'}`}
-                />
-                {appliedCoupon ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      removeCoupon();
-                      setCouponInput('');
-                      setCouponStatus(null);
-                      setCouponMessage('');
-                    }}
-                    className="bg-rose-50 hover:bg-rose-100 text-rose-600 font-semibold text-sm px-5 py-3 rounded-xl transition-colors shadow-xs whitespace-nowrap cursor-pointer"
-                  >
-                    Remove
-                  </button>
-                ) : (
-                  <button
-                    type="submit"
-                    className="bg-[#a47a4c] hover:bg-[#8e673e] text-white font-semibold text-sm px-6 py-3 rounded-xl transition-colors shadow-sm whitespace-nowrap cursor-pointer"
-                  >
-                    Apply
-                  </button>
-                )}
-              </form>
-
-              {couponMessage && (
-                <p className={`text-xs font-semibold mt-2 ${couponStatus === 'success' ? 'text-emerald-600' : 'text-rose-500'}`}>
-                  {couponStatus === 'success' ? '✓ ' : '✗ '}{couponMessage}
-                </p>
-              )}
-            </div>
+          {/* ── Bottom: Order summary ──────────────────────── */}
+          <div className="max-w-xl ml-auto pt-4">
 
             {/* Order total */}
             <div className="bg-white border border-slate-200/80 rounded-2xl p-5 sm:p-7 shadow-xs">
@@ -317,13 +332,13 @@ const CartPage = () => {
               <div className="space-y-3.5 text-sm">
                 <div className="flex justify-between text-slate-500">
                   <span>Subtotal</span>
-                  <span className="font-semibold text-slate-900">₹{subtotal}</span>
+                  <span className="font-semibold text-slate-900">₹{formatPrice(subtotal)}</span>
                 </div>
 
                 {discount > 0 && (
                   <div className="flex justify-between text-emerald-600 bg-emerald-50/60 px-3 py-2.5 rounded-xl border border-emerald-100/50">
                     <span className="text-xs font-bold uppercase tracking-wide">Coupon savings</span>
-                    <span className="font-bold">−₹{discount}</span>
+                    <span className="font-bold">−₹{formatPrice(discount)}</span>
                   </div>
                 )}
 
@@ -334,7 +349,7 @@ const CartPage = () => {
 
                 <div className="flex justify-between items-center pt-3 border-t border-slate-100 text-base font-bold text-slate-900">
                   <span>Total</span>
-                  <span className="text-lg tracking-tight">₹{total}</span>
+                  <span className="text-lg tracking-tight">₹{formatPrice(total)}</span>
                 </div>
               </div>
 

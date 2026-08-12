@@ -13,8 +13,8 @@ import Orders from './pages/Orders';
 import CategoriesPage from './pages/Categories';
 import AddCategory from './pages/AddCategory';
 import EditCategory from './pages/EditCategory';
-import VariantsPage from './pages/Variants';
-import EditVariant from './pages/EditVariant';
+// import VariantsPage from './pages/Variants';
+// import EditVariant from './pages/EditVariant';
 import DesignTemplatesPage from './pages/DesignTemplatesPage';
 import CustomDesigns from './pages/CustomDesigns';
 import Cliparts from './pages/Cliparts';
@@ -30,6 +30,7 @@ import Refunds from './pages/Refunds';
 import Inventory from './pages/Inventory';
 import CreateBanner from './pages/CreateBanner';
 import EditBanner from './pages/EditBanner';
+import CancellationRequests from './pages/CancellationRequests';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -72,12 +73,13 @@ function App() {
           }>
             <Route path='/' element={<Dashboard />} />
             <Route path='/orders' element={<Orders />} />
+            <Route path='/cancellation-requests' element={<CancellationRequests />} />
             <Route path='/categories' element={<CategoriesPage />} />
             <Route path='/categories/add' element={<AddCategory />} />
             <Route path='/categories/edit/:id' element={<EditCategory />} />
-            <Route path='/variants' element={<VariantsPage />} />
+            {/* <Route path='/variants' element={<VariantsPage />} /> */}
 
-            <Route path='/variants/edit/:id' element={<EditVariant />} />
+            {/* <Route path='/variants/edit/:id' element={<EditVariant />} /> */}
             <Route path="/products" element={<Products />} />
             <Route path="/products/add" element={<AddProduct />} />
             <Route path="/products/edit/:id" element={<EditProduct />} />

@@ -3,7 +3,6 @@ import ApiResponse from '../utils/ApiResponse.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { uploadBufferToCloudinary } from '../utils/cloudinaryHelper.js';
 
-// Helper to safely parse JSON strings sent via FormData
 const parseJSONField = (value, fallback = []) => {
   if (!value) return fallback;
   if (typeof value !== 'string') return value;
@@ -13,6 +12,32 @@ const parseJSONField = (value, fallback = []) => {
     console.error(`Failed to parse JSON field: ${value}`, err);
     return fallback;
   }
+};
+
+const formatSizeObjects = (rawSizes = [], salePrice, basePrice) => {
+  if (!Array.isArray(rawSizes)) return [];
+  const defaultPrice = (salePrice !== undefined && salePrice !== null && salePrice !== '') 
+    ? Number(salePrice) 
+    : Number(basePrice || 0);
+
+  return rawSizes.map((item) => {
+    if (typeof item === 'string') {
+      const trimmed = item.trim();
+      return trimmed ? { size: trimmed, price: defaultPrice } : null;
+    }
+    if (item && typeof item === 'object') {
+      const sizeVal = (item.size || item.name || '').toString().trim();
+      if (!sizeVal) return null;
+      const customPrice = (item.price !== undefined && item.price !== null && item.price !== '')
+        ? Number(item.price)
+        : null;
+      return {
+        size: sizeVal,
+        price: customPrice !== null && !isNaN(customPrice) ? customPrice : defaultPrice,
+      };
+    }
+    return null;
+  }).filter(Boolean);
 };
 
 export const getProducts = asyncHandler(async (req, res) => {
@@ -46,14 +71,13 @@ export const createProduct = asyncHandler(async (req, res) => {
     }
   }
 
+  // Upload images concurrently instead of sequentially
   if (imageFiles.length > 0) {
-    for (const file of imageFiles) {
-      const result = await uploadBufferToCloudinary(file.buffer, 'products');
-      imageUrls.push({
-        url: result.secure_url,
-        publicId: result.public_id
-      });
-    }
+    const uploadPromises = imageFiles.map(file => uploadBufferToCloudinary(file.buffer, 'products'));
+    const results = await Promise.all(uploadPromises);
+    results.forEach(result => {
+      imageUrls.push({ url: result.secure_url, publicId: result.public_id });
+    });
   }
 
   if (sizeChartFile) {
@@ -61,17 +85,19 @@ export const createProduct = asyncHandler(async (req, res) => {
     sizeChartUrl = result.secure_url;
   }
 
-  // Parse JSON fields sent via multipart/form-data
+  const basePrice = Number(req.body.basePrice || req.body.price || 0);
+  const salePrice = req.body.salePrice !== undefined && req.body.salePrice !== '' ? Number(req.body.salePrice) : undefined;
   const colors = parseJSONField(req.body.colors, []);
-  const sizes = parseJSONField(req.body.sizes, []);
+  const rawSizes = parseJSONField(req.body.sizes, []);
+  const sizes = formatSizeObjects(rawSizes, salePrice, basePrice);
   const searchTags = parseJSONField(req.body.searchTags, []);
   const tags = parseJSONField(req.body.tags, []);
   const collections = parseJSONField(req.body.collections, []);
 
   const productData = {
     ...req.body,
-    basePrice: Number(req.body.basePrice || req.body.price),
-    salePrice: req.body.salePrice !== undefined && req.body.salePrice !== '' ? Number(req.body.salePrice) : undefined,
+    basePrice,
+    salePrice,
     images: imageUrls,
     colors,
     sizes,
@@ -93,12 +119,10 @@ export const createProduct = asyncHandler(async (req, res) => {
 export const updateProduct = asyncHandler(async (req, res) => {
   let imageUrls = [];
 
-  // Handle existing images passed back from frontend
   if (req.body.existingImages) {
     imageUrls = parseJSONField(req.body.existingImages, []);
   }
 
-  // Handle new uploaded files
   let newImageFiles = [];
   let sizeChartFile = null;
 
@@ -112,13 +136,11 @@ export const updateProduct = asyncHandler(async (req, res) => {
   }
 
   if (newImageFiles.length > 0) {
-    for (const file of newImageFiles) {
-      const result = await uploadBufferToCloudinary(file.buffer, 'products');
-      imageUrls.push({
-        url: result.secure_url,
-        publicId: result.public_id
-      });
-    }
+    const uploadPromises = newImageFiles.map(file => uploadBufferToCloudinary(file.buffer, 'products'));
+    const results = await Promise.all(uploadPromises);
+    results.forEach(result => {
+      imageUrls.push({ url: result.secure_url, publicId: result.public_id });
+    });
   }
 
   let sizeChartUrl = undefined;
@@ -129,7 +151,6 @@ export const updateProduct = asyncHandler(async (req, res) => {
 
   const updates = { ...req.body };
 
-  // Numeric transformations
   if (req.body.price || req.body.basePrice) {
     updates.basePrice = Number(req.body.price || req.body.basePrice);
   }
@@ -137,7 +158,6 @@ export const updateProduct = asyncHandler(async (req, res) => {
     updates.salePrice = req.body.salePrice !== '' ? Number(req.body.salePrice) : null;
   }
 
-  // Images updates
   if (newImageFiles.length > 0 || req.body.existingImages !== undefined) {
     updates.images = imageUrls;
   }
@@ -148,14 +168,17 @@ export const updateProduct = asyncHandler(async (req, res) => {
     updates.sizeChart = '';
   }
 
-  // JSON Field Updates
   if (req.body.colors !== undefined) updates.colors = parseJSONField(req.body.colors, []);
-  if (req.body.sizes !== undefined) updates.sizes = parseJSONField(req.body.sizes, []);
+  if (req.body.sizes !== undefined) {
+    const rawSizes = parseJSONField(req.body.sizes, []);
+    const basePrice = updates.basePrice !== undefined ? updates.basePrice : Number(req.body.price || req.body.basePrice || 0);
+    const salePrice = updates.salePrice !== undefined ? updates.salePrice : (req.body.salePrice !== '' ? Number(req.body.salePrice) : undefined);
+    updates.sizes = formatSizeObjects(rawSizes, salePrice, basePrice);
+  }
   if (req.body.searchTags !== undefined) updates.searchTags = parseJSONField(req.body.searchTags, []);
   if (req.body.tags !== undefined) updates.tags = parseJSONField(req.body.tags, []);
   if (req.body.collections !== undefined) updates.collections = parseJSONField(req.body.collections, []);
 
-  // Boolean flags
   if (req.body.newArrival !== undefined) {
     updates.newArrival = req.body.newArrival === 'true' || req.body.newArrival === true;
   }
@@ -172,7 +195,6 @@ export const deleteProduct = asyncHandler(async (req, res) => {
   res.status(200).json(new ApiResponse(200, result, 'Product disabled successfully'));
 });
 
-// Tags and Collections
 export const getTags = asyncHandler(async (req, res) => {
   const tags = await productService.getTags();
   res.status(200).json(new ApiResponse(200, tags, 'Tags retrieved successfully'));

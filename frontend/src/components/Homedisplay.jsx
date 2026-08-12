@@ -236,7 +236,7 @@ export default function HomeDisplay() {
   }, []);
 
   return (
-    <section className="w-full bg-white py-20 px-4 sm:px-6 lg:px-12 xl:px-24">
+    <section className="w-full bg-[#FCFCFC] py-12 px-4 sm:px-6 lg:px-12 xl:px-24">
 
       {/* Redesigned Minimal & Premium Section Header */}
       {/* Redesigned Minimal & Premium Section Header */}

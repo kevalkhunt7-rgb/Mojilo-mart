@@ -6,12 +6,12 @@ import pricingService from './pricingService.js';
 import ApiError from '../utils/ApiError.js';
 
 const TEMPLATE_BASE_PRICES = {
-  'half_sleeve_t_shirt': 299,
+  'half_sleeve_t_shirt': 249,
   'long_sleeve_t_shirt': 399,
   'oversized_t_shirt': 449,
   'hoodie': 699,
   'sports_jersey': 499,
-  'half-sleeve': 299,
+  'half-sleeve': 249,
   'long-sleeve': 399,
   'oversized': 449,
   'sports-jersey': 499,
@@ -163,9 +163,13 @@ class CustomCartService {
     let grandTotal = 0;
 
     for (const item of cart.items) {
-      const customization = await Customization.findById(item.customizationId);
-      if (customization) {
-        customization.layers = await Layer.find({ customizationId: item.customizationId });
+      let customizationObj = null;
+      if (item.customizationId) {
+        const customDoc = await Customization.findById(item.customizationId).lean();
+        if (customDoc) {
+          customizationObj = customDoc;
+          customizationObj.layers = await Layer.find({ customizationId: item.customizationId }).lean();
+        }
       }
 
       const basePrice = await this.getTemplatePrice(item.clothingType);
@@ -178,7 +182,7 @@ class CustomCartService {
       };
 
       const pricing = pricingService.calculatePrice({
-        customization,
+        customization: customizationObj,
         variant,
         quantity: item.quantity
       });
@@ -188,7 +192,7 @@ class CustomCartService {
       grandTotal += pricing.subTotal;
     }
 
-    cart.totalAmount = grandTotal;
+    cart.totalAmount = Math.round(grandTotal * 100) / 100;
     await cart.save();
     return await this.populateCustomCart(cart);
   }

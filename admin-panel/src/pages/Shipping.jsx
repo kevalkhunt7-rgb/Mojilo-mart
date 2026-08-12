@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import api from '../lib/axios';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { Search, Plus, Trash2, Edit2, Truck, Clock, MapPin, DollarSign } from 'lucide-react';
@@ -22,7 +22,7 @@ const Shipping = () => {
   const fetchMethods = async () => {
     setLoading(true);
     try {
-      const res = await axios.get('/api/shipping/methods', { withCredentials: true });
+      const res = await api.get('/shipping/methods');
       setMethods(res.data?.data || []);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to fetch shipping methods');
@@ -46,10 +46,10 @@ const Shipping = () => {
 
     try {
       if (editingMethod) {
-        await axios.patch(`/api/shipping/methods/${editingMethod._id}`, payload, { withCredentials: true });
+        await api.patch(`/shipping/methods/${editingMethod._id}`, payload);
         toast.success('Shipping method updated successfully!');
       } else {
-        await axios.post('/api/shipping/methods', payload, { withCredentials: true });
+        await api.post('/shipping/methods', payload);
         toast.success('Shipping method created successfully!');
       }
       setIsModalOpen(false);
@@ -62,7 +62,7 @@ const Shipping = () => {
 
   const handleToggleStatus = async (methodId, currentStatus) => {
     try {
-      await axios.patch(`/api/shipping/methods/${methodId}`, { isActive: !currentStatus }, { withCredentials: true });
+      await api.patch(`/shipping/methods/${methodId}`, { isActive: !currentStatus });
       toast.success('Shipping method status updated');
       fetchMethods();
     } catch (err) {
@@ -72,7 +72,7 @@ const Shipping = () => {
 
   const handleDelete = async (methodId) => {
     try {
-      await axios.delete(`/api/shipping/methods/${methodId}`, { withCredentials: true });
+      await api.delete(`/shipping/methods/${methodId}`);
       toast.success('Shipping method deleted successfully!');
       setConfirmDeleteId(null);
       fetchMethods();
