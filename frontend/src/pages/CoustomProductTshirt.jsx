@@ -1658,7 +1658,7 @@ export default function CoustomProductTshirt() {
                   <button
                     key={sizeLabel}
                     onClick={() => setProductSize(sizeLabel)}
-                    title={priceAddon > 0 ? `+₹${priceAddon} for ${sizeLabel}` : sizeLabel}
+                    title={priceAddon > 0 ? `₹${priceAddon} for ${sizeLabel}` : sizeLabel}
                     className={`relative w-9 h-8 rounded-lg text-xs font-bold transition-all duration-200 border cursor-pointer hover:scale-105 active:scale-95 ${isSelected
                         ? "bg-[#997241] border-[#997241] text-white shadow-md shadow-[#997241]/30"
                         : "bg-white border-slate-200 dark:bg-slate-700 dark:border-slate-600 text-slate-600 dark:text-slate-200 hover:border-[#997241]/50 hover:bg-[#997241]/5 dark:hover:bg-slate-600"
@@ -1667,7 +1667,7 @@ export default function CoustomProductTshirt() {
                     {sizeLabel}
                     {priceAddon > 0 && (
                       <span className="absolute -top-1.5 -right-1 text-[8px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/50 px-0.5 rounded leading-none">
-                        +{priceAddon}
+                        {priceAddon}
                       </span>
                     )}
                   </button>
@@ -1919,7 +1919,7 @@ export default function CoustomProductTshirt() {
                   onClick={handleAddRosterRow}
                   className="w-full py-2 bg-[#997241]/10 dark:bg-[#997241]/15 hover:bg-[#997241]/20 dark:hover:bg-[#997241]/25 border border-[#997241]/30 dark:border-[#997241]/40 rounded-lg text-xs font-bold text-[#7c5c34] dark:text-[#c2a274] flex items-center justify-center gap-1.5 transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
                 >
-                  <UserPlus className="h-3.5 w-3.5" /> + Add Player to Roster
+                  <UserPlus className="h-3.5 w-3.5" /> + Add T-shirt to Roster
                 </button>
               </div>
             )}
@@ -2114,7 +2114,7 @@ export default function CoustomProductTshirt() {
           </div>
 
           <div
-            className={`flex flex-col h-full bg-white dark:bg-slate-800 transition-all duration-300 overflow-hidden z-20 border-r border-slate-100 dark:border-slate-700 ${leftSidebarOpen ? "flex-1 lg:w-[300px]" : "w-0"
+            className={`flex flex-col h-full bg-white dark:bg-slate-800 transition-all duration-300 overflow-hidden z-20 border-r border-slate-100 dark:border-slate-700 ${leftSidebarOpen ? "flex-1 lg:w-[380px]" : "w-0"
               }`}
           >
             <div className="flex-1 overflow-y-auto p-4 space-y-5">

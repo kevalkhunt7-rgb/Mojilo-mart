@@ -51,7 +51,20 @@ export const logout = asyncHandler(async (req, res) => {
 
 export const verifyEmail = asyncHandler(async (req, res) => {
   const result = await authService.verifyEmail(req.body);
-  res.status(200).json(new ApiResponse(200, result, 'Email verified successfully'));
+
+  if (result.refreshToken) {
+    res.cookie('refreshToken', result.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      maxAge: 30 * 24 * 60 * 60 * 1000
+    });
+  }
+
+  res.status(200).json(new ApiResponse(200, {
+    user: result.user,
+    accessToken: result.accessToken
+  }, result.message));
 });
 
 export const forgotPassword = asyncHandler(async (req, res) => {

@@ -49,7 +49,7 @@ export default function Banner1() {
           <img 
             src={BennerMan}
             alt="Fitness model featuring Positive Mind T-shirt" 
-            className="w-full h-auto object-contain object-bottom mt-0 md:-mt-16 mb-0 drop-shadow-[0_15px_15px_rgba(0,0,0,0.4)] transition-transform duration-500 ease-out hover:scale-105"
+            className="w-full h-auto object-contain object-bottom mt-0 md:-mt-16 mb-0 drop-shadow-[0_15px_15px_rgba(0,0,0,0.4)] transition-transform duration-500 ease-out hover:scale-80"
           />
         </div>
       </div>

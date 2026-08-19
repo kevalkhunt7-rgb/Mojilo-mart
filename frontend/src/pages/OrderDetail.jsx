@@ -170,6 +170,10 @@ export default function OrderDetail() {
   const currentStatus = (order.orderStatus || order.status || 'pending').toLowerCase();
   const currentStepIdx = FULFILLMENT_STEPS.indexOf(currentStatus);
 
+  const orderStatusLower = (order.orderStatus || order.status || '').toLowerCase();
+  const paymentStatusLower = (order.paymentStatus || '').toLowerCase();
+  const isRefunded = orderStatusLower === 'refunded' || paymentStatusLower === 'refunded' || paymentStatusLower.includes('refund');
+
   return (
     <div className="bg-[#FAF9F6] min-h-screen py-8 sm:py-12 font-sans antialiased text-slate-800">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -208,8 +212,23 @@ export default function OrderDetail() {
           </div>
         </div>
 
+        {/* Refund Success Notice Banner */}
+        {isRefunded && (
+          <div className="bg-emerald-50 border border-emerald-200 p-5 rounded-3xl mb-8 flex items-start gap-3.5 text-emerald-900 shadow-xs">
+            <div className="w-9 h-9 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
+              <CheckCircle size={20} />
+            </div>
+            <div>
+              <h4 className="font-bold text-sm text-emerald-950">Refund Processed Successfully</h4>
+              <p className="text-xs text-emerald-700 mt-1 leading-relaxed">
+                Refunded amount will be credited to your account within 5-7 working days.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Cancellation Requested Banner */}
-        {currentStatus === 'cancellation_requested' && (
+        {currentStatus === 'cancellation_requested' && !isRefunded && (
           <div className="bg-amber-50 border border-amber-200 p-5 rounded-3xl mb-8 flex items-start gap-3 text-amber-900 shadow-xs">
             <AlertCircle size={20} className="text-amber-600 shrink-0 mt-0.5" />
             <div>

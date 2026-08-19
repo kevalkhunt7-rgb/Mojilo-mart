@@ -36,6 +36,10 @@ export const useCanvasTextureSync = (options = {}) => {
       "object:scaling",
       "object:moving",
       "object:rotating",
+      "object:skewing",
+      "text:changed",
+      "path:created",
+      "after:render",
     ];
 
     const updateTexture = async (view) => {
@@ -64,12 +68,12 @@ export const useCanvasTextureSync = (options = {}) => {
       }
     };
 
-    const debouncedUpdateFront = canvasSyncManager.debounce(() => updateTexture("front"), 100);
-    const debouncedUpdateBack = canvasSyncManager.debounce(() => updateTexture("back"), 100);
-    const debouncedUpdateLeft = canvasSyncManager.debounce(() => updateTexture("left"), 100);
-    const debouncedUpdateRight = canvasSyncManager.debounce(() => updateTexture("right"), 100);
-    const debouncedUpdatePocket = canvasSyncManager.debounce(() => updateTexture("pocket"), 100);
-    const debouncedUpdateHood = canvasSyncManager.debounce(() => updateTexture("hood"), 100);
+    const debouncedUpdateFront = canvasSyncManager.debounce(() => updateTexture("front"), 60);
+    const debouncedUpdateBack = canvasSyncManager.debounce(() => updateTexture("back"), 60);
+    const debouncedUpdateLeft = canvasSyncManager.debounce(() => updateTexture("left"), 60);
+    const debouncedUpdateRight = canvasSyncManager.debounce(() => updateTexture("right"), 60);
+    const debouncedUpdatePocket = canvasSyncManager.debounce(() => updateTexture("pocket"), 60);
+    const debouncedUpdateHood = canvasSyncManager.debounce(() => updateTexture("hood"), 60);
 
     const eventBinds = [
       { canvas: frontCanvas, handler: debouncedUpdateFront },

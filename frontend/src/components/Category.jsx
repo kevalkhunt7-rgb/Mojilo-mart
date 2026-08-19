@@ -55,7 +55,7 @@ export default function Category() {
             w-full h-48 sm:h-64
             md:w-1/2 md:h-auto md:aspect-[4/5]
           "
-          onClick={() => navigate('/collection?Category=man')}
+          onClick={() => navigate('/collection?Gender=Men')}
         >
           <img
             src={categoryimg1}
@@ -72,7 +72,7 @@ export default function Category() {
           {/* Badge */}
           <div className="absolute bottom-4 sm:bottom-5 left-1/2 -translate-x-1/2 w-[72%] max-w-[210px]">
             <button
-              onClick={e => { e.stopPropagation(); navigate('/collection?Category=man'); }}
+              onClick={e => { e.stopPropagation(); navigate('/collection?Gender=Men'); }}
               className="
                 w-full bg-white/95 backdrop-blur-sm text-black font-bold
                 py-2 sm:py-2.5 px-3 rounded-lg sm:rounded-xl
@@ -130,7 +130,7 @@ export default function Category() {
             w-full h-48 sm:h-64
             md:w-1/2 md:h-auto md:aspect-[4/5]
           "
-          onClick={() => navigate('/collection?Category=woman')}
+          onClick={() => navigate('/collection?Gender=Women')}
         >
           <img
             src={categoryimg2}
@@ -145,7 +145,7 @@ export default function Category() {
 
           <div className="absolute bottom-4 sm:bottom-5 left-1/2 -translate-x-1/2 w-[72%] max-w-[210px]">
             <button
-              onClick={e => { e.stopPropagation(); navigate('/collection?Category=woman'); }}
+              onClick={e => { e.stopPropagation(); navigate('/collection?Gender=Women'); }}
               className="
                 w-full bg-white/95 backdrop-blur-sm text-black font-bold
                 py-2 sm:py-2.5 px-3 rounded-lg sm:rounded-xl

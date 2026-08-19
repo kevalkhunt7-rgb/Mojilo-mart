@@ -1,11 +1,20 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.resolve(__dirname, '.env') });
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+dotenv.config({ path: path.resolve(process.cwd(), 'backend/.env') });
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import morgan from 'morgan';
-import path from 'path';
 import mongoose from 'mongoose';
 
 // 2. IMPORT YOUR CLOUDINARY CONFIGURATION HOOK
@@ -39,6 +48,7 @@ import bannerRoutes from './routes/bannerRoutes.js';
 import cancellationRoutes from './routes/cancellationRoutes.js';
 import apparelTemplateRoutes, { publicApparelRouter as apparelPublicRoutes } from './routes/apparelTemplateRoutes.js';
 import imageGenerationRoutes from './routes/imageGenerationRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
 
 import { sanitizeData } from './middlewares/sanitize.js';
 import { apiLimiter } from './middlewares/rateLimiter.js';
@@ -151,6 +161,8 @@ app.use('/api/customizations', customizationRoutes);
 app.use('/api/cliparts', clipartRoutes);
 app.use('/api/fonts', fontRoutes);
 app.use('/api/uploads', uploadRoutes);
+// Support legacy/singular path used by some clients: /api/upload
+app.use('/api/upload', uploadRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/custom-cart', customCartRoutes);
 app.use('/api/wishlist', wishlistRoutes);
@@ -168,6 +180,7 @@ app.use('/api/banners', bannerRoutes);
 app.use('/api/admin/apparel-templates', apparelTemplateRoutes);
 app.use('/api/apparel-templates', apparelPublicRoutes); // Public — used by frontend customizer
 app.use('/api/generate-image', imageGenerationRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Fallbacks
 app.use(notFound);

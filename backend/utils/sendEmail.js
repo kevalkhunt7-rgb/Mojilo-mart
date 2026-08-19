@@ -6,9 +6,11 @@ import logger from './logger.js';
  */
 const sendEmail = async ({ email, subject, message, html }) => {
   try {
-    const fromEmail = process.env.FROM_EMAIL || process.env.EMAIL_FROM || 'noreply@yourverifieddomain.com';
+    const fromEmail = process.env.EMAIL_FROM || process.env.FROM_EMAIL || process.env.SMTP_USER || 'noreply@yourverifieddomain.com';
+    const fromName = process.env.FROM_NAME || 'Mojilo';
+
     const mailOptions = {
-      from: `${process.env.FROM_NAME || 'Mojilo'} <${fromEmail}>`,
+      from: `${fromName} <${fromEmail}>`,
       to: email,
       subject: subject,
       text: message,
@@ -16,7 +18,7 @@ const sendEmail = async ({ email, subject, message, html }) => {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    logger.info(`Email successfully sent: ${info.messageId}`);
+    logger.info(`Email successfully sent to ${email} (From: ${fromEmail}): ${info.messageId}`);
     return info;
   } catch (error) {
     logger.error(`Error sending email to ${email}:`, error);

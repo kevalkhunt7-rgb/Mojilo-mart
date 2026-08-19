@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { ShoppingBag, Tag, Trash2, ChevronRight } from 'lucide-react';
 import api from '../lib/axios';
 import CartItem3DViewer from '../components/CartItem3DViewer';
+import { useSettings } from '../context/SettingsContext';
 
 const formatPrice = (val) => {
   const num = Number(val || 0);
@@ -96,13 +97,23 @@ const CartPage = () => {
     }
   };
 
+  const { settings } = useSettings();
+
   const subtotal = cart.reduce((acc, item) => {
     const itemPrice = getItemPrice(item);
     return acc + itemPrice * (item.quantity || 1);
   }, 0);
 
   const discount = appliedCoupon?.discountAmount || 0;
-  const total = Math.max(0, subtotal - discount);
+
+  const shippingEnabled = settings?.shippingEnabled !== false;
+  const freeThreshold = settings?.freeShippingThreshold !== undefined ? Number(settings.freeShippingThreshold) : 999;
+  const defaultFee = settings?.defaultShippingCharge !== undefined ? Number(settings.defaultShippingCharge) : 50;
+
+  const isFreeShipping = !shippingEnabled || subtotal >= freeThreshold;
+  const shippingCharge = isFreeShipping ? 0 : defaultFee;
+
+  const total = Math.max(0, subtotal - discount + shippingCharge);
 
   const handleApplyCoupon = async (e) => {
     e.preventDefault();
@@ -342,10 +353,23 @@ const CartPage = () => {
                   </div>
                 )}
 
-                <div className="flex justify-between text-slate-500">
+                <div className="flex justify-between items-center text-slate-500">
                   <span>Shipping</span>
-                  <span className="text-[10px] bg-slate-100 text-slate-600 font-bold uppercase tracking-widest px-3 py-1 rounded-full">Free</span>
+                  {isFreeShipping ? (
+                    <span className="text-[10px] bg-emerald-50 text-emerald-600 border border-emerald-200 font-bold uppercase tracking-widest px-3 py-1 rounded-full">
+                      Free
+                    </span>
+                  ) : (
+                    <span className="font-bold text-slate-900">
+                      ₹{formatPrice(shippingCharge)}
+                    </span>
+                  )}
                 </div>
+                {!isFreeShipping && freeThreshold > 0 && (
+                  <p className="text-xs text-amber-800 bg-amber-50 px-3 py-2 rounded-xl font-medium border border-amber-200/60">
+                    💡 Add ₹{formatPrice(freeThreshold - subtotal)} more for <span className="font-bold">FREE Shipping</span>!
+                  </p>
+                )}
 
                 <div className="flex justify-between items-center pt-3 border-t border-slate-100 text-base font-bold text-slate-900">
                   <span>Total</span>

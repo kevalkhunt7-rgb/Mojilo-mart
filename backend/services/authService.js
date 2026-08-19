@@ -207,7 +207,25 @@ class AuthService {
       await user.save();
     }
 
-    return { message: 'Email address verified successfully. You can now login.' };
+    // Generate tokens for automatic session login after registration
+    const accessToken = generateAccessToken(user._id);
+    const refreshToken = generateRefreshToken(user._id);
+
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    await this.saveRefreshToken(user._id, refreshToken, expiresAt);
+
+    return {
+      message: 'Registration and email verification successful. Automatically logged in.',
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        permissions: user.permissions
+      },
+      accessToken,
+      refreshToken
+    };
   }
 
   async sendForgotPasswordOTP(email) {

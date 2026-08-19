@@ -290,10 +290,17 @@ const CustomDesigns = () => {
 
   const handleAddDesignSubmit = async (e) => {
     e.preventDefault();
-    const targetProductId = newDesign.productId || products[0]?._id;
-    if (!newDesign.name || !targetProductId) {
+    const trimmedName = (newDesign.name || '').trim();
+
+    if (!trimmedName) {
       return toast.warning('Design name is required');
     }
+
+    let targetProductId = newDesign.productId || (products && products.length > 0 ? products[0]._id : null);
+    if (targetProductId === 'undefined' || targetProductId === 'null') {
+      targetProductId = null;
+    }
+
     if (uploadMethod === 'local' && !localFile && !editingDesignId) {
       return toast.warning('Please select a local layout file to upload');
     }
@@ -318,13 +325,14 @@ const CustomDesigns = () => {
 
     setSubmitting(true);
     try {
-      const printAreasRes = await api.get(`/designs/print-areas/${targetProductId}`);
+      const printAreaEndpoint = targetProductId ? `/designs/print-areas/${targetProductId}` : '/designs/print-areas/default';
+      const printAreasRes = await api.get(printAreaEndpoint);
       let printAreas = printAreasRes.data?.data || [];
       let printAreaId;
 
       if (printAreas.length === 0) {
         const newPrintAreaRes = await api.post('/designs/print-areas', {
-          product: targetProductId,
+          product: targetProductId || null,
           name: 'Front Printable Area',
           width: 300,
           height: 400
@@ -345,8 +353,8 @@ const CustomDesigns = () => {
         if (uploadMethod === 'local' && localFile) {
           const formData = new FormData();
           formData.append('image', localFile);
-          formData.append('name', newDesign.name);
-          formData.append('productId', targetProductId);
+          formData.append('name', trimmedName);
+          if (targetProductId) formData.append('productId', targetProductId);
           formData.append('customizations', JSON.stringify(customizations));
 
           await api.patch(`/designs/${editingDesignId}`, formData, {
@@ -354,8 +362,8 @@ const CustomDesigns = () => {
           });
         } else {
           await api.patch(`/designs/${editingDesignId}`, {
-            name: newDesign.name,
-            productId: targetProductId,
+            name: trimmedName,
+            productId: targetProductId || null,
             previewImage: uploadMethod === 'url' ? {
               url: finalPreviewUrl,
               publicId: `admin_custom_design_${Date.now()}`
@@ -368,8 +376,8 @@ const CustomDesigns = () => {
         if (uploadMethod === 'local') {
           const formData = new FormData();
           formData.append('image', localFile);
-          formData.append('name', newDesign.name);
-          formData.append('productId', targetProductId);
+          formData.append('name', trimmedName);
+          if (targetProductId) formData.append('productId', targetProductId);
           formData.append('customizations', JSON.stringify(customizations));
 
           await api.post('/designs/save', formData, {
@@ -377,8 +385,8 @@ const CustomDesigns = () => {
           });
         } else {
           await api.post('/designs/save', {
-            name: newDesign.name,
-            productId: targetProductId,
+            name: trimmedName,
+            productId: targetProductId || null,
             previewImage: {
               url: finalPreviewUrl,
               publicId: `admin_custom_design_${Date.now()}`

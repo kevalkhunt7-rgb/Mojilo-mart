@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import Design from '../models/Design.js';
 import Customization from '../models/Customization.js';
 import TextLayer from '../models/TextLayer.js';
@@ -9,22 +10,28 @@ import ApiError from '../utils/ApiError.js';
 
 class DesignService {
   async getPrintAreasByProduct(productId) {
+    if (!productId || productId === 'undefined' || productId === 'null' || productId === 'default' || !mongoose.Types.ObjectId.isValid(productId)) {
+      return await PrintArea.find({ $or: [{ product: null }, { product: { $exists: false } }] });
+    }
     return await PrintArea.find({ product: productId });
   }
 
   async createPrintArea(printAreaData) {
-    return await PrintArea.create(printAreaData);
+    const data = { ...printAreaData };
+    if (!data.product || data.product === 'undefined' || data.product === 'null' || data.product === 'default' || !mongoose.Types.ObjectId.isValid(data.product)) {
+      data.product = null;
+    }
+    return await PrintArea.create(data);
   }
 
   async saveUserDesign(userId, { name, productId, customizations, previewImage }) {
-    // customizations: array of { printAreaId, backgroundColor, textLayers, imageLayers }
-
+    const validProductId = (productId && productId !== 'undefined' && productId !== 'null' && productId !== 'default' && mongoose.Types.ObjectId.isValid(productId)) ? productId : null;
     const customizationIds = [];
 
     for (const cust of customizations) {
       const customization = await Customization.create({
         user: userId,
-        product: productId,
+        product: validProductId,
         printArea: cust.printAreaId,
         backgroundColor: cust.backgroundColor || '#ffffff',
       });
@@ -46,7 +53,7 @@ class DesignService {
 
     const design = await Design.create({
       user: userId,
-      product: productId,
+      product: validProductId,
       name,
       customizations: customizationIds,
       previewImage: previewImage || undefined

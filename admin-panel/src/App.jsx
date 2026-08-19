@@ -31,6 +31,7 @@ import Inventory from './pages/Inventory';
 import CreateBanner from './pages/CreateBanner';
 import EditBanner from './pages/EditBanner';
 import CancellationRequests from './pages/CancellationRequests';
+import Settings from './pages/Settings';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -97,6 +98,7 @@ function App() {
             <Route path="/payments" element={<Payments />} />
             <Route path="/refunds" element={<Refunds />} />
             <Route path="/inventory" element={<Inventory />} />
+            <Route path="/settings" element={<Settings />} />
           </Route>
         </Routes>
       </Router>

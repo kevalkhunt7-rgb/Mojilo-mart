@@ -9,6 +9,7 @@ import Footer from './components/Footer'
 import Collection from './pages/Collection'
 import ScrollToTop from './components/ScollToTop'
 import ContactUs from './pages/ContactUs'
+import AboutUs from './pages/AboutUs'
 import Custom from './pages/Custom'
 import ProductDetails from './pages/ProductDetails'
 import Profile from './pages/Profile'
@@ -19,6 +20,8 @@ import OrderDetail from './pages/OrderDetail'
 import NotFound from './pages/NotFound'
 import CoustomProductTshirt from './pages/CoustomProductTshirt'
 import ProtectedRoute from './components/ProtectedRoute'
+import CustomCursor from './components/CustomCursor'
+import MaintenanceMode from './pages/MaintenanceMode'
 
 // Context Providers
 import { WishlistProvider } from './context/WishlistContext'
@@ -26,6 +29,7 @@ import { CartProvider } from './context/CartContext'
 import { AuthProvider } from './context/AuthContext' 
 import { OrdersProvider } from './context/OrdersContext' 
 import { CanvasProvider } from './context/CanvasContext' 
+import { SettingsProvider, useSettings } from './context/SettingsContext'
 
 // Redux Imports
 import { Provider } from 'react-redux'
@@ -39,9 +43,53 @@ const MainLayout = () => {
       <ScrollToTop />
       <Outlet /> {/* Child routes render here */}
       <Footer />
+      <CustomCursor /> {/* Custom cursor component */}
     </>
   )
 }
+
+// Inner routes content that checks maintenance mode
+const AppContent = () => {
+  const { settings } = useSettings();
+
+  if (settings?.maintenanceMode) {
+    return <MaintenanceMode brandName={settings?.storeName || 'Mojilo'} />;
+  }
+
+  return (
+    <Routes>
+      {/* Routes with Navbar & Footer */}
+      <Route element={<MainLayout />}>
+        <Route path="/" element={<Home />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/new-offers" element={<NewOffers />} />
+        <Route path="/collection" element={<Collection />} />
+        <Route path="/about-us" element={<AboutUs />} />
+        <Route path="/about" element={<AboutUs />} />
+        <Route path="/contact-us" element={<ContactUs />} />
+        <Route path="/custom" element={<Custom />} />
+        <Route path="/product-details/:id" element={<ProductDetails />} />
+        <Route path="/my-profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} /> 
+        <Route path="/order/:id" element={<ProtectedRoute><OrderDetail /></ProtectedRoute>} />
+        <Route path="/my-wishlist" element={<Wishlist />} />
+        <Route path="/cart" element={<Cart />} />
+        <Route path="/checkout" element={<CheckOut />} />
+        <Route path="/*" element={<NotFound />} />
+      </Route>
+
+      {/* Route WITHOUT Navbar & Footer */}
+      <Route 
+        path="/coustom-product-tshirt/:apparelId" 
+        element={
+          <>
+            <ScrollToTop />
+            <CoustomProductTshirt />
+          </>
+        } 
+      />
+    </Routes>
+  );
+};
 
 const App = () => {
   return (
@@ -70,45 +118,17 @@ const App = () => {
       />
       <Provider store={store}>
         <AuthProvider>
-          <CartProvider>
-            <WishlistProvider>
-              <OrdersProvider> 
-                <CanvasProvider>
-                  
-                  <Routes>
-                    {/* Routes with Navbar & Footer */}
-                    <Route element={<MainLayout />}>
-                      <Route path="/" element={<Home />} />
-                      <Route path="/login" element={<Login />} />
-                      <Route path="/new-offers" element={<NewOffers />} />
-                      <Route path="/collection" element={<Collection />} />
-                      <Route path="/contact-us" element={<ContactUs />} />
-                      <Route path="/custom" element={<Custom />} />
-                      <Route path="/product-details/:id" element={<ProductDetails />} />
-                      <Route path="/my-profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} /> 
-                      <Route path="/order/:id" element={<ProtectedRoute><OrderDetail /></ProtectedRoute>} />
-                      <Route path="/my-wishlist" element={<Wishlist />} />
-                      <Route path="/cart" element={<Cart />} />
-                      <Route path="/checkout" element={<CheckOut />} />
-                      <Route path="/*" element={<NotFound />} />
-                    </Route>
-
-                    {/* Route WITHOUT Navbar & Footer */}
-                    <Route 
-                      path="/coustom-product-tshirt/:apparelId" 
-                      element={
-                        <>
-                          <ScrollToTop />
-                          <CoustomProductTshirt />
-                        </>
-                      } 
-                    />
-                  </Routes>
-
-                </CanvasProvider>
-              </OrdersProvider> 
-            </WishlistProvider>
-          </CartProvider>
+          <SettingsProvider>
+            <CartProvider>
+              <WishlistProvider>
+                <OrdersProvider> 
+                  <CanvasProvider>
+                    <AppContent />
+                  </CanvasProvider>
+                </OrdersProvider> 
+              </WishlistProvider>
+            </CartProvider>
+          </SettingsProvider>
         </AuthProvider>
       </Provider>
     </div>

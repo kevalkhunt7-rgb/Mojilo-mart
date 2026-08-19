@@ -791,15 +791,6 @@ export default function TypographyPanel({ manualSync }) {
             />
           </div>
 
-          {/* 👕 THE "APPLY CHANGES TO T-SHIRT MODEL" BUTTON */}
-          <button
-            type="button"
-            onClick={handleApplyTypographyChanges}
-            className="w-full mt-2 flex items-center justify-center gap-2 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-semibold shadow-sm transition-all active:scale-95 cursor-pointer"
-          >
-            <Check className="h-4 w-4" /> Apply to T-Shirt Model
-          </button>
-
         </div>
       ) : (
         <div className="pt-6 text-center border-t border-gray-100">

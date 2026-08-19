@@ -64,7 +64,10 @@ export const useCustomizerStore = create((set, get) => ({
     const productSize = enabledSizes.some((size) => size.size === state.productSize)
       ? state.productSize
       : (enabledSizes[0]?.size || state.productSize);
-    const basePrice = selectedTemplate?.basePrice ?? BASE_PRICES[currentProduct] ?? state.pricingDetails.base;
+    const defaultBasePrice = selectedTemplate?.basePrice ?? BASE_PRICES[currentProduct] ?? state.pricingDetails.base;
+    const selectedSizeObj = (selectedTemplate?.sizes || []).find((s) => s.size === productSize);
+    const sizePrice = Number(selectedSizeObj?.priceAddon || 0);
+    const effectiveBasePrice = sizePrice > 0 ? sizePrice : defaultBasePrice;
 
     return {
       apparelTemplates: templates,
@@ -73,8 +76,8 @@ export const useCustomizerStore = create((set, get) => ({
       productSize,
       pricingDetails: {
         ...state.pricingDetails,
-        base: basePrice,
-        total: basePrice + state.pricingDetails.text + state.pricingDetails.image + state.pricingDetails.ai + state.pricingDetails.area + state.pricingDetails.extra,
+        base: parseFloat(effectiveBasePrice.toFixed(2)),
+        total: parseFloat((effectiveBasePrice + state.pricingDetails.text + state.pricingDetails.image + state.pricingDetails.ai + state.pricingDetails.area + state.pricingDetails.extra).toFixed(2)),
       },
     };
   }),
@@ -83,27 +86,26 @@ export const useCustomizerStore = create((set, get) => ({
     const state = get();
     // Prefer live admin price; fall back to hardcoded BASE_PRICES
     const liveTemplate = state.apparelTemplates?.[product];
-    const basePrice = liveTemplate?.basePrice ?? BASE_PRICES[product] ?? 19.99;
+    const defaultBasePrice = liveTemplate?.basePrice ?? BASE_PRICES[product] ?? 249;
 
     // ── Reset color: pick first color of the new product's palette ──────────
-    // If the new product has a live color palette from the admin panel, use its
-    // first color.  If current color happens to be in the new palette, keep it.
-    // Fallback to #FFFFFF (always safe on any garment).
     const newColors = liveTemplate?.availableColors;
     let newColor = "#FFFFFF";
     if (newColors && newColors.length > 0) {
-      // Keep existing color only if it exists in the new product's palette
       newColor = newColors.includes(state.productColor) ? state.productColor : newColors[0];
     }
 
     // ── Reset size: pick first enabled size of the new product ───────────────
     const newSizes = liveTemplate?.sizes?.filter((s) => s.enabled);
     const firstSize = newSizes?.[0]?.size ?? "M";
-    // Keep current size only if it is valid for the new product
     const sizeIsValid = newSizes
       ? newSizes.some((s) => s.size === state.productSize)
       : true;
     const newSize = sizeIsValid ? state.productSize : firstSize;
+
+    const selectedSizeObj = liveTemplate?.sizes?.find((s) => s.size === newSize);
+    const sizePrice = Number(selectedSizeObj?.priceAddon || 0);
+    const effectiveBasePrice = sizePrice > 0 ? sizePrice : defaultBasePrice;
 
     set((st) => {
       // Auto-adjust selected view if the new product doesn't support the current view
@@ -122,15 +124,37 @@ export const useCustomizerStore = create((set, get) => ({
         productSize: newSize,
         pricingDetails: {
           ...st.pricingDetails,
-          base: basePrice,
-          total: basePrice + st.pricingDetails.text + st.pricingDetails.image + st.pricingDetails.ai + st.pricingDetails.area + st.pricingDetails.extra,
+          base: parseFloat(effectiveBasePrice.toFixed(2)),
+          total: parseFloat((effectiveBasePrice + st.pricingDetails.text + st.pricingDetails.image + st.pricingDetails.ai + st.pricingDetails.area + st.pricingDetails.extra).toFixed(2)),
         },
       };
     });
   },
 
   setProductColor: (color) => set({ productColor: color }),
-  setProductSize: (size) => set({ productSize: size }),
+  setProductSize: (size) => set((state) => {
+    const liveTemplate = state.apparelTemplates?.[state.currentProduct];
+    const defaultBasePrice = liveTemplate?.basePrice ?? BASE_PRICES[state.currentProduct] ?? 249;
+    const sizeObj = liveTemplate?.sizes?.find((s) => s.size === size);
+    const sizePrice = Number(sizeObj?.priceAddon || 0);
+    const effectiveBasePrice = sizePrice > 0 ? sizePrice : defaultBasePrice;
+
+    const textCost = state.pricingDetails.text || 0;
+    const imageCost = state.pricingDetails.image || 0;
+    const aiCost = state.pricingDetails.ai || 0;
+    const areaCost = state.pricingDetails.area || 0;
+    const extraCost = state.pricingDetails.extra || 0;
+    const total = effectiveBasePrice + textCost + imageCost + aiCost + areaCost + extraCost;
+
+    return {
+      productSize: size,
+      pricingDetails: {
+        ...state.pricingDetails,
+        base: parseFloat(effectiveBasePrice.toFixed(2)),
+        total: parseFloat(total.toFixed(2)),
+      },
+    };
+  }),
   setSelectedView: (view) => set({ selectedView: view }),
   setGridVisible: (visible) => set({ gridVisible: visible }),
   setRulersVisible: (visible) => set({ rulersVisible: visible }),
@@ -146,7 +170,10 @@ export const useCustomizerStore = create((set, get) => ({
     // canvasesData: { front: Array, back: Array, left: Array, right: Array, pocket: Array, hood: Array }
     const state = get();
     const liveTemplate = state.apparelTemplates?.[state.currentProduct];
-    const basePrice = liveTemplate?.basePrice ?? BASE_PRICES[state.currentProduct] ?? 19.99;
+    const defaultBasePrice = liveTemplate?.basePrice ?? BASE_PRICES[state.currentProduct] ?? 249;
+    const selectedSizeObj = liveTemplate?.sizes?.find((s) => s.size === state.productSize);
+    const sizePrice = Number(selectedSizeObj?.priceAddon || 0);
+    const effectiveBasePrice = sizePrice > 0 ? sizePrice : defaultBasePrice;
 
     const costPerText      = 0;
     const costPerUpload    = 0;
@@ -192,13 +219,13 @@ export const useCustomizerStore = create((set, get) => ({
     });
 
     const extraPrintAreaCost = activeViewsCount > 1 ? (activeViewsCount - 1) * costPerExtraSide : 0.0;
-    const total = basePrice + textCost + imageCost + aiCost + areaCost + extraPrintAreaCost;
+    const total = effectiveBasePrice + textCost + imageCost + aiCost + areaCost + extraPrintAreaCost;
 
     const elementList = getElementBreakdown(canvasesData);
 
     set({
       pricingDetails: {
-        base:     parseFloat(basePrice.toFixed(2)),
+        base:     parseFloat(effectiveBasePrice.toFixed(2)),
         text:     parseFloat(textCost.toFixed(2)),
         image:    parseFloat(imageCost.toFixed(2)),
         ai:       parseFloat(aiCost.toFixed(2)),

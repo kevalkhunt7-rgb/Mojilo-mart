@@ -315,9 +315,9 @@ function TemplateCard({ template, onSave, saving }) {
                     {sz}
                   </span>
 
-                  {/* Price add-on */}
+                  {/* Price override */}
                   <div className="flex items-center gap-1.5 ml-auto">
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold">+₹</span>
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold">₹</span>
                     <input
                       type="number"
                       min="0"
@@ -333,7 +333,7 @@ function TemplateCard({ template, onSave, saving }) {
 
                   {row.priceAddon > 0 && row.enabled && (
                     <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded-full whitespace-nowrap">
-                      +₹{row.priceAddon}
+                      ₹{row.priceAddon}
                     </span>
                   )}
                 </div>

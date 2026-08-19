@@ -41,3 +41,45 @@ export const sanitizePhoneInput = (val) => {
   const digits = val.replace(/\D/g, '');
   return digits.slice(0, 10);
 };
+
+/**
+ * Validates password criteria:
+ * - Minimum Length: 8 characters or more
+ * - Character Variety: At least one uppercase letter (A-Z) and one lowercase letter (a-z)
+ * - Numbers: At least one numeric digit (0-9)
+ * - Special Symbols: At least one special character (e.g. !@#$%^&*)
+ * @param {string} password 
+ * @returns {object} { isValid, minLength, hasUppercase, hasLowercase, hasNumber, hasSpecialChar, errors }
+ */
+export const validatePassword = (password = '') => {
+  const str = password || '';
+  const minLength = str.length >= 8;
+  const hasUppercase = /[A-Z]/.test(str);
+  const hasLowercase = /[a-z]/.test(str);
+  const hasNumber = /[0-9]/.test(str);
+  const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(str);
+
+  const errors = [];
+  if (!minLength) errors.push('At least 8 characters long');
+  if (!hasUppercase) errors.push('At least one uppercase letter (A–Z)');
+  if (!hasLowercase) errors.push('At least one lowercase letter (a–z)');
+  if (!hasNumber) errors.push('At least one numeric digit (0–9)');
+  if (!hasSpecialChar) errors.push('At least one special character (!@#$%^&*)');
+
+  const isValid = minLength && hasUppercase && hasLowercase && hasNumber && hasSpecialChar;
+
+  return {
+    isValid,
+    minLength,
+    hasUppercase,
+    hasLowercase,
+    hasNumber,
+    hasSpecialChar,
+    errors
+  };
+};
+
+export const isValidPassword = (password) => {
+  return validatePassword(password).isValid;
+};
+

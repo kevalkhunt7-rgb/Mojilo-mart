@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
-import { Link, NavLink, useLocation, Outlet } from 'react-router-dom';
+import { Link, NavLink, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import api from '../lib/axios';
+import { ShoppingBag, AlertTriangle, Package, AlertCircle, Info } from 'lucide-react';
 import logo from "../assets/logo1.png"
 import logo2 from "../assets/favicon.png"
 /* ============================================================
@@ -51,9 +53,81 @@ const Layout = () => {
   const isDark = theme === 'dark';
   const activeTokens = isDark ? darkTokens : tokens;
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, logout } = useAuth();
   const notifRef = useRef(null);
   const profileRef = useRef(null);
+
+  const [notifications, setNotifications] = useState([]);
+  const [orderCount, setOrderCount] = useState(0);
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await api.get('/notifications');
+      const data = res.data?.data || res.data || [];
+      if (Array.isArray(data)) {
+        setNotifications(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch notifications:', err);
+    }
+  };
+
+  const fetchOrderCount = async () => {
+    try {
+      const res = await api.get('/orders?limit=1');
+      const total = res.data?.data?.pagination?.totalItems ?? res.data?.pagination?.totalItems ?? 0;
+      setOrderCount(total);
+    } catch (err) {
+      console.error('Failed to fetch order count:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+    fetchOrderCount();
+    const interval = setInterval(() => {
+      fetchNotifications();
+      fetchOrderCount();
+    }, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleNotificationClick = async (notification) => {
+    if (!notification.isRead) {
+      try {
+        await api.patch(`/notifications/${notification._id}/read`);
+        setNotifications((prev) =>
+          prev.map((n) => (n._id === notification._id ? { ...n, isRead: true } : n))
+        );
+      } catch (err) {
+        console.error('Failed to mark notification read:', err);
+      }
+    }
+    setNotifOpen(false);
+    if (notification.link) {
+      navigate(notification.link);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      await api.patch('/notifications/read-all');
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    } catch (err) {
+      console.error('Failed to mark all as read:', err);
+    }
+  };
+
+  const handleClearAll = async () => {
+    try {
+      await api.delete('/notifications');
+      setNotifications([]);
+    } catch (err) {
+      console.error('Failed to clear notifications:', err);
+    }
+  };
 
   useEffect(() => {
     const handleClick = (e) => {
@@ -91,7 +165,7 @@ const Layout = () => {
       title: 'Operations',
       items: [
         { name: 'Dashboard', path: '/', icon: <DashboardIcon /> },
-        { name: 'Orders', path: '/orders', icon: <OrdersIcon />, badge: 12 },
+        { name: 'Orders', path: '/orders', icon: <OrdersIcon />, badge: orderCount > 0 ? orderCount : undefined },
         { name: 'Products', path: '/products', icon: <ProductsIcon /> },
         { name: 'Categories', path: '/categories', icon: <CategoriesIcon /> },
       ],
@@ -117,8 +191,14 @@ const Layout = () => {
       items: [
         { name: 'Coupons', path: '/coupons', icon: <CouponsIcon /> },
         { name: 'Payments', path: '/payments', icon: <PaymentsIcon /> },
-        { name: 'Refunds', path: '/refunds', icon: <RefundsIcon />, badge: 3 },
+        { name: 'Refunds', path: '/refunds', icon: <RefundsIcon /> },
         { name: 'Cancellation Requests', path: '/cancellation-requests', icon: <CancellationIcon /> },
+      ],
+    },
+    {
+      title: 'System',
+      items: [
+        { name: 'Settings', path: '/settings', icon: <SettingsIcon /> },
       ],
     },
   ];
@@ -308,36 +388,95 @@ const Layout = () => {
             <div className="relative" ref={notifRef}>
               <button
                 onClick={() => setNotifOpen((v) => !v)}
-                className="p-2 rounded-lg  text-white hover:text-black transition-colors relative cursor-pointer"
-
+                className="p-2 rounded-lg text-white hover:text-black transition-colors relative cursor-pointer"
                 onMouseEnter={(e) => (e.currentTarget.style.background = activeTokens.canvas)}
                 onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                title="Notifications"
               >
                 <BellIcon />
-                <span
-                  className="absolute top-1.5 right-1.5 w-[7px] h-[7px] rounded-full"
-                  style={{ background: activeTokens.accent, boxShadow: `0 0 0 2px ${activeTokens.surface}` }}
-                />
+                {unreadCount > 0 && (
+                  <span
+                    className="absolute top-1 right-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold text-white leading-none flex items-center justify-center min-w-[16px]"
+                    style={{ background: '#ef4444', boxShadow: `0 0 0 2px ${activeTokens.surface}` }}
+                  >
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
               </button>
               {notifOpen && (
                 <div
-                  className="absolute right-0 mt-2 w-80 rounded-xl overflow-hidden shadow-lg"
+                  className="absolute right-0 mt-2 w-80 sm:w-96 rounded-xl overflow-hidden shadow-2xl z-50 text-left animate-in fade-in zoom-in-95 duration-100"
                   style={{ background: activeTokens.surface, border: `1px solid ${activeTokens.line}` }}
                 >
-                  <div className="px-4 py-3" style={{ borderBottom: `1px solid ${activeTokens.line}` }}>
-                    <span className="text-[13px] font-semibold" style={{ color: activeTokens.ink900 }}>Notifications</span>
+                  <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: `1px solid ${activeTokens.line}` }}>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[13px] font-semibold" style={{ color: activeTokens.ink900 }}>Notifications</span>
+                      {unreadCount > 0 && (
+                        <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-500/10 text-amber-500">
+                          {unreadCount} new
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {unreadCount > 0 && (
+                        <button
+                          onClick={handleMarkAllAsRead}
+                          className="text-[11px] font-medium text-amber-500 hover:text-amber-600 transition-colors cursor-pointer"
+                        >
+                          Mark all read
+                        </button>
+                      )}
+                      {notifications.length > 0 && (
+                        <button
+                          onClick={handleClearAll}
+                          className="text-[11px] font-medium text-slate-400 hover:text-rose-500 transition-colors cursor-pointer"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <div className="py-1 max-h-72 overflow-y-auto">
-                    {[
-                      { title: 'New order #4821 placed', time: '2m ago' },
-                      { title: 'Refund request from A. Shah', time: '1h ago' },
-                      { title: 'Low stock: Matte Vinyl Banner 3x5', time: '3h ago' },
-                    ].map((n, i) => (
-                      <div key={i} className="px-4 py-2.5 flex flex-col gap-0.5 cursor-pointer" onMouseEnter={(e) => (e.currentTarget.style.background = activeTokens.canvas)} onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
-                        <span className="text-[12.5px] font-medium" style={{ color: activeTokens.ink900 }}>{n.title}</span>
-                        <span className="text-[11px]" style={{ color: activeTokens.ink400 }}>{n.time}</span>
+                  <div className="py-1 max-h-80 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+                    {notifications.length === 0 ? (
+                      <div className="p-6 text-center text-xs text-slate-400">
+                        No notifications yet
                       </div>
-                    ))}
+                    ) : (
+                      notifications.map((n) => {
+                        const timeAgo = formatTimeAgo(n.createdAt);
+                        return (
+                          <div
+                            key={n._id}
+                            onClick={() => handleNotificationClick(n)}
+                            className={`px-4 py-3 flex items-start gap-3 cursor-pointer transition-colors ${
+                              !n.isRead ? 'bg-amber-500/5' : ''
+                            }`}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = activeTokens.canvas)}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = !n.isRead ? 'rgba(245,158,11,0.05)' : 'transparent')}
+                          >
+                            <div className="mt-0.5 shrink-0">
+                              {getNotifIcon(n.type)}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-1">
+                                <span className={`text-[12.5px] truncate ${!n.isRead ? 'font-bold' : 'font-medium'}`} style={{ color: activeTokens.ink900 }}>
+                                  {n.title}
+                                </span>
+                                <span className="text-[10px] shrink-0" style={{ color: activeTokens.ink400 }}>
+                                  {timeAgo}
+                                </span>
+                              </div>
+                              <p className="text-[11.5px] text-slate-500 dark:text-slate-400 line-clamp-2 mt-0.5">
+                                {n.message}
+                              </p>
+                            </div>
+                            {!n.isRead && (
+                              <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0 mt-1.5" />
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
                   </div>
                 </div>
               )}
@@ -526,5 +665,41 @@ const CancellationIcon = () => (
     <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
   </svg>
 );
+
+const SettingsIcon = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+);
+
+function formatTimeAgo(dateString) {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffSec = Math.floor((now - date) / 1000);
+  if (diffSec < 60) return 'Just now';
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  const diffDays = Math.floor(diffHr / 24);
+  return `${diffDays}d ago`;
+}
+
+const getNotifIcon = (type) => {
+  switch (type) {
+    case 'order_placed':
+      return <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500"><ShoppingBag size={14} /></div>;
+    case 'cancellation_requested':
+      return <div className="p-1.5 rounded-lg bg-rose-500/10 text-rose-500"><AlertTriangle size={14} /></div>;
+    case 'order_update':
+      return <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-500"><Package size={14} /></div>;
+    case 'stock_alert':
+      return <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-500"><AlertCircle size={14} /></div>;
+    default:
+      return <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-500"><Info size={14} /></div>;
+  }
+};
 
 export default Layout;

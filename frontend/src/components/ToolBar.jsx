@@ -228,14 +228,6 @@ const ToolBar = ({
                 ))}
               </div>
             </div>
-
-            {/* 👕 THE "APPLY TO T-SHIRT MODEL" CONFIRMATION BUTTON */}
-            <button
-              onClick={handleApplyGarmentChanges}
-              className="w-full mt-4 h-9 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <Check className="h-3.5 w-3.5" /> Apply to T-Shirt Model
-            </button>
           </div>,
           document.body
         )}

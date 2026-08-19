@@ -5,9 +5,12 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useWishlist } from '../context/WishlistContext';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { useSettings } from '../context/SettingsContext';
+
 import api from '../lib/axios';
 
 export default function Navbar() {
+  const { settings } = useSettings();
   const [isMenuOpen, setIsMenuOpen]     = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [activeTab, setActiveTab]       = useState('Home');
@@ -25,16 +28,17 @@ export default function Navbar() {
   const navLinks = [
     { name: 'Home',       href: '/' },
     { name: 'New Offers', href: '/new-offers' },
-    { name: 'Man',        href: '/collection?Gender=Man' },
-    { name: 'Woman',      href: '/collection?Gender=Woman' },
+    { name: 'Men',        href: '/collection?Gender=Men' },
+    { name: 'Women',      href: '/collection?Gender=Women' },
     { name: 'Unisex',     href: '/collection?Gender=Unisex' },
     { name: 'Custom',     href: '/custom' },
+    { name: 'About Us',   href: '/about-us' },
     { name: 'Contact Us', href: '/contact-us' },
   ];
 
   const categories = [
-    { name: 'Man',    href: '/collection?Gender=Man' },
-    { name: 'Woman',  href: '/collection?Gender=Woman' },
+    { name: 'Men',    href: '/collection?Gender=Men' },
+    { name: 'Women',  href: '/collection?Gender=Women' },
     { name: 'Unisex', href: '/collection?Gender=Unisex' },
   ];
 
@@ -191,9 +195,10 @@ export default function Navbar() {
         {/* CENTER — Logo */}
         <Link to="/" className="flex justify-start lg:justify-center" onClick={() => setActiveTab('Home')}>
           <img
-            src={logo}
-            alt="Mojilo"
-            className="h-7 sm:h-8 w-auto transition-opacity duration-200 hover:opacity-80"
+            src={settings?.logoUrl || logo}
+            alt={settings?.storeName || "Mojilo"}
+            className="h-7 sm:h-8 w-auto transition-opacity duration-200 hover:opacity-80 max-w-[160px] object-contain"
+            onError={(e) => { e.target.src = logo; }}
           />
         </Link>
 

@@ -4,7 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
 import LogoForContactUs from '../assets/LogoForContactUs.png';
 import { useAuth } from '../context/AuthContext';
-import { isValidEmail } from '../utils/validation';
+import { isValidEmail, validatePassword } from '../utils/validation';
+import { Eye, EyeOff, Check, ShieldCheck } from 'lucide-react';
 
 /* ─── Inline keyframe styles ─────────────────────────────────────────────── */
 const styles = `
@@ -73,23 +74,25 @@ const styles = `
 
 const AuthPage = () => {
   const navigate  = useNavigate();
-  const { login, signup, verifyEmailOtp, googleLogin, isAuthenticated } = useAuth();
+  const { login, signup, verifyEmailOtp, googleLogin, forgotPassword, resetPassword, isAuthenticated } = useAuth();
 
-  const [viewMode, setViewMode] = useState('signup'); // 'signup', 'login', 'verify'
+  const [viewMode, setViewMode] = useState('signup'); // 'signup', 'login', 'verify', 'forgot', 'reset'
   const [error, setError]       = useState('');
   const [formKey, setFormKey]   = useState(0); 
   const [loading, setLoading]   = useState(false);
   const [otpCode, setOtpCode]   = useState('');
   const [authForm, setAuthForm] = useState({ name: '', identifier: '', password: '' });
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
-    if (isAuthenticated) navigate('/my-profile');
+    if (isAuthenticated) navigate('/');
   }, [isAuthenticated, navigate]);
 
   const switchMode = (mode) => {
     setViewMode(mode);
     setError('');
     setOtpCode('');
+    setShowPassword(false);
     setAuthForm({ name: '', identifier: '', password: '' });
     setFormKey(k => k + 1); 
   };
@@ -100,6 +103,15 @@ const AuthPage = () => {
     setError('');
   };
 
+  const pwdStatus = validatePassword(authForm.password);
+  const passedCount = [
+    pwdStatus.minLength,
+    pwdStatus.hasUppercase,
+    pwdStatus.hasLowercase,
+    pwdStatus.hasNumber,
+    pwdStatus.hasSpecialChar
+  ].filter(Boolean).length;
+
   const handleFormSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -108,6 +120,22 @@ const AuthPage = () => {
     if (!isValidEmail(emailTrimmed)) {
       setError('Please enter a valid email address.');
       return;
+    }
+
+    if (viewMode === 'signup') {
+      if (!pwdStatus.isValid) {
+        setError(pwdStatus.errors[0] || 'Password does not meet security criteria.');
+        return;
+      }
+    } else if (viewMode === 'reset') {
+      if (!otpCode || otpCode.length !== 6) {
+        setError('Please enter a valid 6-digit OTP code.');
+        return;
+      }
+      if (!pwdStatus.isValid) {
+        setError(pwdStatus.errors[0] || 'New password does not meet security criteria.');
+        return;
+      }
     }
 
     setLoading(true);
@@ -120,12 +148,21 @@ const AuthPage = () => {
         setFormKey(k => k + 1);
       } else if (viewMode === 'verify') {
         const result = await verifyEmailOtp(emailTrimmed, otpCode);
-        toast.success(result.message || 'Email verified successfully! You can now log in.');
+        toast.success(result.message || 'Registration verified! You are now logged in.');
+        navigate('/login');
+      } else if (viewMode === 'forgot') {
+        const result = await forgotPassword(emailTrimmed);
+        toast.success(result.message || 'Password reset OTP sent to your email.');
+        setViewMode('reset');
+        setFormKey(k => k + 1);
+      } else if (viewMode === 'reset') {
+        const result = await resetPassword(emailTrimmed, otpCode, authForm.password);
+        toast.success(result.message || 'Password updated successfully! Please log in.');
         switchMode('login');
       } else {
         await login(emailTrimmed, authForm.password);
         toast.success('Welcome back to Mojilo!');
-        navigate('/my-profile');
+        navigate('/');
       }
     } catch (err) {
       setError(err.message || 'An error occurred. Please try again.');
@@ -144,7 +181,7 @@ const AuthPage = () => {
     try {
       await googleLogin(credentialResponse.credential);
       toast.success('Signed in with Google successfully!');
-      navigate('/my-profile');
+      navigate('/');
     } catch (err) {
       setError(err.message || 'Google authentication failed.');
     } finally {
@@ -223,19 +260,31 @@ const AuthPage = () => {
               {/* Header */}
               <div className="anim-fadeUp delay-100 space-y-2">
                 <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
-                  {viewMode === 'signup' ? 'Create an account' : viewMode === 'verify' ? 'Verify Email Address' : 'Welcome back'}
+                  {viewMode === 'signup'
+                    ? 'Create an account'
+                    : viewMode === 'verify'
+                    ? 'Verify Email Address'
+                    : viewMode === 'forgot'
+                    ? 'Forgot Password'
+                    : viewMode === 'reset'
+                    ? 'Reset Password'
+                    : 'Welcome back'}
                 </h2>
                 <p className="text-sm text-slate-400 font-medium">
                   {viewMode === 'signup'
                     ? 'Fill in your details to get started.'
                     : viewMode === 'verify'
                     ? 'Enter the 6-digit OTP verification code sent to your email.'
+                    : viewMode === 'forgot'
+                    ? 'Enter your registered email address to receive a 6-digit reset OTP.'
+                    : viewMode === 'reset'
+                    ? 'Enter the OTP sent to your email and your new secure password.'
                     : 'Sign in to continue to your account.'}
                 </p>
               </div>
 
               {/* Mode toggle pills */}
-              {viewMode !== 'verify' && (
+              {(viewMode === 'signup' || viewMode === 'login') && (
                 <div className="anim-fadeUp delay-200 flex bg-slate-100 rounded-xl p-1 gap-1">
                   {['signup', 'login'].map(mode => (
                     <button
@@ -279,7 +328,7 @@ const AuthPage = () => {
                   </div>
                 )}
 
-                {viewMode !== 'verify' ? (
+                {(viewMode === 'signup' || viewMode === 'login' || viewMode === 'forgot') ? (
                   <div className="anim-fieldSlide delay-100 space-y-1.5">
                     <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Email</label>
                     <input
@@ -294,7 +343,9 @@ const AuthPage = () => {
                   </div>
                 ) : (
                   <div className="anim-fieldSlide delay-100 space-y-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Verifying Email</label>
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      {viewMode === 'verify' ? 'Verifying Email' : 'Resetting Password For'}
+                    </label>
                     <input
                       type="text"
                       disabled
@@ -304,9 +355,11 @@ const AuthPage = () => {
                   </div>
                 )}
 
-                {viewMode === 'verify' && (
+                {(viewMode === 'verify' || viewMode === 'reset') && (
                   <div className="anim-fieldSlide space-y-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Verification OTP</label>
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      {viewMode === 'verify' ? 'Verification OTP' : 'Password Reset OTP'}
+                    </label>
                     <input
                       type="text"
                       name="otp"
@@ -320,49 +373,125 @@ const AuthPage = () => {
                   </div>
                 )}
 
-                {viewMode !== 'verify' && (
+                {(viewMode === 'signup' || viewMode === 'login' || viewMode === 'reset') && (
                   <div className="anim-fieldSlide delay-200 space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Password</label>
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                        {viewMode === 'reset' ? 'New Password' : 'Password'}
+                      </label>
                       {viewMode === 'login' && (
                         <button
                           type="button"
-                          onClick={() => toast('OTP-based reset will trigger password recovery.', { icon: '🔑' })}
+                          onClick={() => {
+                            setError('');
+                            setViewMode('forgot');
+                          }}
                           className="text-xs font-bold text-[#a47a4c] hover:text-[#8e673e] transition-colors"
                         >
                           Forgot?
                         </button>
                       )}
                     </div>
-                    <input
-                      type="password"
-                      name="password"
-                      required
-                      placeholder="••••••••"
-                      value={authForm.password}
-                      onChange={handleInputChange}
-                      className={inputClass}
-                    />
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        name="password"
+                        required
+                        placeholder="••••••••"
+                        value={authForm.password}
+                        onChange={handleInputChange}
+                        className={`${inputClass} pr-11`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
+                        tabIndex="-1"
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
+
+                    {/* Interactive password strength & requirement checklist on Sign Up & Reset */}
+                    {(viewMode === 'signup' || viewMode === 'reset') && (
+                      <div className="mt-3 p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl space-y-2.5 anim-fadeIn">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                            <ShieldCheck size={14} className="text-[#a47a4c]" /> Password Requirements
+                          </span>
+                          {authForm.password.length > 0 && (
+                            <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+                              pwdStatus.isValid ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' :
+                              passedCount >= 3 ? 'bg-amber-100 text-amber-700 border border-amber-200' :
+                              'bg-rose-100 text-rose-700 border border-rose-200'
+                            }`}>
+                              {pwdStatus.isValid ? 'Strong' : passedCount >= 3 ? 'Medium' : 'Weak'}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Visual Strength Progress Bar */}
+                        <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full transition-all duration-300 ${
+                              pwdStatus.isValid ? 'bg-emerald-500' :
+                              passedCount >= 3 ? 'bg-amber-500' :
+                              passedCount >= 1 ? 'bg-rose-500' : 'bg-slate-300'
+                            }`}
+                            style={{ width: `${(passedCount / 5) * 100}%` }}
+                          />
+                        </div>
+
+                        {/* Individual Rules Checklist */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1">
+                          {[
+                            { label: '8+ characters', met: pwdStatus.minLength },
+                            { label: 'One uppercase (A–Z)', met: pwdStatus.hasUppercase },
+                            { label: 'One lowercase (a–z)', met: pwdStatus.hasLowercase },
+                            { label: 'One digit (0–9)', met: pwdStatus.hasNumber },
+                            { label: 'One symbol (!@#$%^&*)', met: pwdStatus.hasSpecialChar },
+                          ].map((rule, idx) => (
+                            <div key={idx} className="flex items-center gap-1.5 text-xs">
+                              <span className={`flex items-center justify-center w-4 h-4 rounded-full text-[10px] transition-all duration-200 ${
+                                rule.met ? 'bg-emerald-500 text-white font-bold scale-105 shadow-xs' : 'bg-slate-200 text-slate-400'
+                              }`}>
+                                {rule.met ? <Check size={10} strokeWidth={3} /> : '•'}
+                              </span>
+                              <span className={rule.met ? 'text-slate-800 font-semibold' : 'text-slate-400 font-normal'}>
+                                {rule.label}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
+
 
                 {/* CTA buttons */}
                 <div className="anim-fieldSlide delay-300 pt-2 space-y-3">
                   <button type="submit" disabled={loading} className="shimmer-btn w-full text-white font-bold text-sm py-4 rounded-xl tracking-wider uppercase disabled:opacity-50">
-                    {loading ? 'Processing...' : (viewMode === 'signup' ? 'Create Account' : viewMode === 'verify' ? 'Verify OTP' : 'Sign In')}
+                    {loading ? 'Processing...' : (
+                      viewMode === 'signup' ? 'Create Account' :
+                      viewMode === 'verify' ? 'Verify OTP' :
+                      viewMode === 'forgot' ? 'Send Reset OTP' :
+                      viewMode === 'reset' ? 'Reset Password' : 'Sign In'
+                    )}
                   </button>
 
-                  {viewMode === 'verify' && (
+                  {(viewMode === 'verify' || viewMode === 'forgot' || viewMode === 'reset') && (
                     <button
                       type="button"
-                      onClick={() => switchMode('signup')}
+                      onClick={() => switchMode(viewMode === 'verify' ? 'signup' : 'login')}
                       className="w-full bg-white border border-slate-200 hover:bg-slate-50 active:scale-[0.985] text-slate-600 font-bold text-xs sm:text-sm py-3.5 rounded-xl transition-all duration-200 text-center uppercase tracking-wider"
                     >
-                      Back to Sign Up
+                      {viewMode === 'verify' ? 'Back to Sign Up' : 'Back to Log In'}
                     </button>
                   )}
 
-                  {viewMode !== 'verify' && (
+                  {(viewMode === 'signup' || viewMode === 'login') && (
                     <div className="pt-2 space-y-3">
                       <div className="relative w-full flex items-center justify-center my-1">
                         <div className="border-t border-slate-200 w-full" />
@@ -400,7 +529,7 @@ const AuthPage = () => {
               </form>
 
               {/* Footer switch */}
-              {viewMode !== 'verify' && (
+              {(viewMode === 'signup' || viewMode === 'login') && (
                 <div className="anim-fadeIn delay-400 pt-4 border-t border-slate-100 text-center text-sm font-medium text-slate-400">
                   {viewMode === 'signup' ? (
                     <>

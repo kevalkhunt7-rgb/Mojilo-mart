@@ -12,16 +12,20 @@ class OrderRepository extends BaseRepository {
   }
 
   async getOrdersList({ skip = 0, limit = 20 }) {
-    // 1. Fetch orders list
+    // 1. Fetch orders list (exclude unconfirmed abandoned pending checkouts)
+    const filter = {
+      $nor: [{ paymentStatus: 'pending', orderStatus: 'pending' }]
+    };
+
     const [orders, total] = await Promise.all([
-      Order.find({})
+      Order.find(filter)
         .select('orderNumber user totalAmount paymentStatus orderStatus createdAt shippingAddress')
         .populate('user', 'name email')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
-      Order.countDocuments({})
+      Order.countDocuments(filter)
     ]);
 
     if (orders.length === 0) {
@@ -268,7 +272,10 @@ class OrderRepository extends BaseRepository {
   }
 
   async findByUserId(userId) {
-    const orders = await Order.find({ user: userId })
+    const orders = await Order.find({
+      user: userId,
+      $nor: [{ paymentStatus: 'pending', orderStatus: 'pending' }]
+    })
       .select('orderNumber totalAmount paymentStatus orderStatus createdAt shippingAddress discountAmount pricingSummary subTotal')
       .sort({ createdAt: -1 })
       .lean();

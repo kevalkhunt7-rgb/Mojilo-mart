@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import api from '../lib/axios';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { Search, Plus, Undo2, Calendar, CheckCircle2, AlertTriangle, ArrowRightLeft, DollarSign } from 'lucide-react';
+import { Search, Plus, Undo2, Calendar, CheckCircle2, AlertTriangle, RefreshCw, DollarSign } from 'lucide-react';
 
 const Refunds = () => {
   const [refunds, setRefunds] = useState([]);
@@ -10,6 +10,7 @@ const Refunds = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [syncingId, setSyncingId] = useState(null);
   
   const [formData, setFormData] = useState({
     orderId: '',
@@ -55,19 +56,18 @@ const Refunds = () => {
     }
   };
 
-  const handleUpdateStatus = async (refundId, currentStatus) => {
-    // Cycle status: pending -> processed -> failed -> pending
-    let nextStatus = 'processed';
-    if (currentStatus === 'pending') nextStatus = 'processed';
-    else if (currentStatus === 'processed') nextStatus = 'failed';
-    else if (currentStatus === 'failed') nextStatus = 'pending';
-
+  const handleSyncStatus = async (refundId) => {
+    setSyncingId(refundId);
     try {
-      await api.patch(`/refunds/${refundId}`, { status: nextStatus });
-      toast.success(`Refund status updated to ${nextStatus}`);
-      fetchRefunds();
+      const res = await api.post(`/refunds/${refundId}/sync`);
+      const msg = res.data?.message || 'Refund status synced from gateway!';
+      toast.success(msg);
+      await fetchRefunds();
     } catch (err) {
-      toast.error('Failed to change status');
+      toast.error(err.response?.data?.message || 'Failed to sync refund status');
+      console.error(err);
+    } finally {
+      setSyncingId(null);
     }
   };
 
@@ -151,7 +151,7 @@ const Refunds = () => {
                   <th className="py-3 px-6">Amount Refunded</th>
                   <th className="py-3 px-6">Status</th>
                   <th className="py-3 px-6">Request Date</th>
-                  <th className="py-3 px-6 text-center">Cycle Status</th>
+                  <th className="py-3 px-6 text-center">Sync Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#f1f5f9] dark:divide-[#272B40] text-sm text-[#334155] dark:text-slate-300">
@@ -196,11 +196,13 @@ const Refunds = () => {
                     </td>
                     <td className="py-4 px-6 text-center">
                       <button
-                        onClick={() => handleUpdateStatus(r._id, r.status)}
-                        className="p-1.5 rounded-lg border border-slate-100 dark:border-[#272B40] text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-[#212538] hover:text-slate-800 dark:hover:text-white transition-colors"
-                        title="Cycle Status (Mock override)"
+                        onClick={() => handleSyncStatus(r._id)}
+                        disabled={syncingId === r._id}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/50 dark:bg-indigo-950/40 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-all disabled:opacity-50 shadow-xs active:scale-95 cursor-pointer"
+                        title="Run webhook / gateway sync to fetch live status"
                       >
-                        <ArrowRightLeft size={13} />
+                        <RefreshCw size={13} className={syncingId === r._id ? "animate-spin" : ""} />
+                        <span>{syncingId === r._id ? 'Syncing...' : 'Run Sync'}</span>
                       </button>
                     </td>
                   </tr>

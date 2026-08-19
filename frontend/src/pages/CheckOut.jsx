@@ -7,6 +7,7 @@ import { useOrders } from '../context/OrdersContext';
 import { ChevronRight, CheckCircle, Tag, Sparkles, Loader2, MapPin, Phone } from 'lucide-react';
 import CartItem3DViewer from '../components/CartItem3DViewer';
 import OrderPlacedPopup from '../components/SuccessModel';
+import { SettingsProvider, useSettings } from '../context/SettingsContext';
 import api from '../lib/axios';
 import { isValidPhone, sanitizePhoneInput } from '../utils/validation';
 
@@ -217,12 +218,22 @@ const Checkout = () => {
     }
   }, [appliedCoupon]);
 
+  const { settings } = useSettings();
+
   const subtotal = (cart || []).reduce((acc, item) => {
     return acc + getItemPrice(item) * (item?.quantity || 1);
   }, 0);
 
   const discountAmount = appliedCoupon?.discountAmount || 0;
-  const grandTotal = Math.max(0, subtotal - discountAmount);
+
+  const shippingEnabled = settings?.shippingEnabled !== false;
+  const freeThreshold = settings?.freeShippingThreshold !== undefined ? Number(settings.freeShippingThreshold) : 999;
+  const defaultFee = settings?.defaultShippingCharge !== undefined ? Number(settings.defaultShippingCharge) : 50;
+
+  const isFreeShipping = !shippingEnabled || subtotal >= freeThreshold;
+  const shippingCharge = isFreeShipping ? 0 : defaultFee;
+
+  const grandTotal = Math.max(0, subtotal - discountAmount + shippingCharge);
 
   const handleApplyCoupon = async (codeToApply) => {
     const code = (codeToApply || couponInput).trim().toUpperCase();
@@ -314,58 +325,25 @@ const Checkout = () => {
         };
       });
 
-      const orderPayload = {
-        items: mappedItems,
-        paymentMethod: 'Online',
-        couponCode: appliedCoupon?.code || null,
-        shippingAddress: {
-          name: formData.firstName,
-          street: formData.apartment ? `${formData.streetAddress}, ${formData.apartment}` : formData.streetAddress,
-          city: formData.townCity,
-          state: formData.state,
-          zipCode: formData.postalCode,
-          phone: formData.phone,
-          country: 'India'
-        },
-        billingAddress: {
-          name: formData.firstName,
-          street: formData.apartment ? `${formData.streetAddress}, ${formData.apartment}` : formData.streetAddress,
-          city: formData.townCity,
-          state: formData.state,
-          zipCode: formData.postalCode,
-          phone: formData.phone,
-          country: 'India'
-        }
+      const shippingAddress = {
+        name: formData.firstName,
+        street: formData.apartment ? `${formData.streetAddress}, ${formData.apartment}` : formData.streetAddress,
+        city: formData.townCity,
+        state: formData.state,
+        zipCode: formData.postalCode,
+        phone: formData.phone,
+        country: 'India'
       };
-
-      const res = await addOrder(orderPayload);
-
-      // Safe extraction of returned order object (addOrder returns { order: {...}, invoiceNumber: ... })
-      const orderObj = res?.order || res?.data?.order || (res?._id ? res : (res?.data?.[0] || res?.data || res || {}));
-      const targetOrderId = orderObj?._id || orderObj?.id;
-      const orderRef = orderObj?.orderNumber || targetOrderId || 'N/A';
-
-      if (!targetOrderId) {
-        throw new Error('Order creation failed: missing order ID');
-      }
-
-      const cancelUnpaid = async (orderId) => {
-        if (!orderId) return;
-        try {
-          await api.post(`/orders/${orderId}/cancel-unpaid`);
-        } catch (cErr) {
-          console.warn('Failed to cleanup unpaid order:', cErr);
-        }
-      };
+      const billingAddress = { ...shippingAddress };
 
       try {
         const payRes = await api.post('/payments/create-order', {
-          orderId: targetOrderId,
-          amount: grandTotal
+          amount: grandTotal,
+          couponCode: appliedCoupon?.code || null
         });
 
         const payData = payRes.data?.data || payRes.data || {};
-        const razorpayKey = payData.key || import.meta.env.VITE_RAZORPAY_KEY_ID ;
+        const razorpayKey = (payData.key || import.meta.env.VITE_RAZORPAY_KEY_ID || '').trim();
 
         const loadScript = () => {
           return new Promise((resolve) => {
@@ -380,7 +358,6 @@ const Checkout = () => {
 
         const isLoaded = await loadScript();
         if (!isLoaded) {
-          await cancelUnpaid(targetOrderId);
           toast.error('Razorpay SDK failed to load.');
           setIsProcessing(false);
           return;
@@ -391,7 +368,7 @@ const Checkout = () => {
           amount: payData.amount,
           currency: payData.currency || 'INR',
           name: 'MOJILO Store',
-          description: `Payment for Order #${orderRef}`,
+          description: 'Payment for Checkout',
           order_id: payData.orderId,
           prefill: {
             name: formData.firstName,
@@ -402,34 +379,41 @@ const Checkout = () => {
           },
           handler: async function (response) {
             try {
-              await api.post('/payments/verify-signature', {
-                orderId: targetOrderId,
+              const verifyRes = await api.post('/payments/verify-signature', {
                 razorpayOrderId: response.razorpay_order_id,
                 razorpayPaymentId: response.razorpay_payment_id,
-                razorpaySignature: response.razorpay_signature
+                razorpaySignature: response.razorpay_signature,
+                shippingAddress,
+                billingAddress,
+                couponCode: appliedCoupon?.code || null
               });
+
+              const resData = verifyRes.data?.data || verifyRes.data || {};
+              const orderObj = resData.order || resData;
+              const orderRef = orderObj.orderNumber || orderObj._id || 'MOJ-ORDER';
 
               toast.success('Online payment successful!');
               setPlacedOrderInfo({
                 orderNumber: orderRef,
-                itemsCount: mappedItems.length,
+                itemsCount: cart.length,
                 totalAmount: grandTotal
               });
+
               if (clearCart) clearCart();
+              if (setCart) setCart([]);
+
               setModalMessage(
                 `Payment verified & order placed successfully! Order Reference ID: ${orderRef}`
               );
               setShowSuccessModal(true);
-              if (setCart) setCart([]);
             } catch (vErr) {
-              await cancelUnpaid(targetOrderId);
               toast.error(vErr.response?.data?.message || 'Payment verification failed.');
+            } finally {
               setIsProcessing(false);
             }
           },
           modal: {
-            ondismiss: async function () {
-              await cancelUnpaid(targetOrderId);
+            ondismiss: function () {
               toast.error('Payment cancelled. Your order was not placed.');
               setIsProcessing(false);
             }
@@ -441,7 +425,6 @@ const Checkout = () => {
         return;
       } catch (payErr) {
         console.error('Razorpay Order Creation Error:', payErr);
-        await cancelUnpaid(targetOrderId);
         toast.error(payErr.response?.data?.message || 'Failed to initialize online payment.');
         setIsProcessing(false);
         return;
@@ -893,10 +876,19 @@ const Checkout = () => {
                   <span className="font-bold">−₹{discountAmount.toFixed(2)}</span>
                 </div>
               )}
-              <div className="flex justify-between text-slate-500">
+              <div className="flex justify-between items-center text-slate-500">
                 <span>Shipping</span>
-                <span className="text-emerald-600 text-[10px] bg-emerald-50 font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-md">Free</span>
+                {isFreeShipping ? (
+                  <span className="text-emerald-600 text-[10px] bg-emerald-50 border border-emerald-200 font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-md">Free</span>
+                ) : (
+                  <span className="text-slate-900 font-bold">₹{shippingCharge.toFixed(2)}</span>
+                )}
               </div>
+              {!isFreeShipping && freeThreshold > 0 && (
+                <p className="text-[11px] text-amber-800 bg-amber-50/80 px-3 py-1.5 rounded-xl font-medium border border-amber-200/60">
+                  💡 Add ₹{(freeThreshold - subtotal).toFixed(2)} more to qualify for <span className="font-bold">FREE Shipping</span>!
+                </p>
+              )}
               <div className="flex justify-between items-center pt-3 border-t border-slate-100 text-base font-bold text-slate-900">
                 <span>Total</span>
                 <span key={`total-${grandTotal}`} className="co-price-flash text-xl font-black tracking-tight text-[#a47a4c] px-1">

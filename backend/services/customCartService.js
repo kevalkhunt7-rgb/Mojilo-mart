@@ -23,7 +23,7 @@ class CustomCartService {
   /**
    * Helper utility to look up template base price from DB or fallback dictionary
    */
-  async getTemplatePrice(clothingType) {
+  async getTemplatePrice(clothingType, size = null) {
     if (!clothingType) return 499;
     const cleaned = cleanKey(clothingType);
 
@@ -38,7 +38,14 @@ class CustomCartService {
       }).lean();
 
       if (dbTemplate && typeof dbTemplate.basePrice === 'number' && dbTemplate.basePrice > 0) {
-        return dbTemplate.basePrice;
+        let price = dbTemplate.basePrice;
+        if (size && Array.isArray(dbTemplate.sizes)) {
+          const szObj = dbTemplate.sizes.find(s => s.size === size || s.size?.toUpperCase() === size?.toUpperCase());
+          if (szObj && typeof szObj.priceAddon === 'number' && szObj.priceAddon > 0) {
+            price += szObj.priceAddon;
+          }
+        }
+        return price;
       }
     } catch (err) {
       console.warn('[CustomCartService] Could not query ApparelTemplate basePrice:', err.message);
@@ -109,7 +116,7 @@ class CustomCartService {
       item.color === color
     );
 
-    const basePrice = await this.getTemplatePrice(clothingType);
+    const basePrice = await this.getTemplatePrice(clothingType, size);
 
     if (existingIndex > -1) {
       cart.items[existingIndex].quantity += Number(quantity);
@@ -172,7 +179,7 @@ class CustomCartService {
         }
       }
 
-      const basePrice = await this.getTemplatePrice(item.clothingType);
+      const basePrice = await this.getTemplatePrice(item.clothingType, item.size);
       
       const variant = {
         price: basePrice,

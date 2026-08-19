@@ -38,6 +38,11 @@ export const AuthProvider = ({ children }) => {
   const signup = async (name, email, password, phoneNumber = '') => {
     try {
       const response = await api.post('/auth/register', { name, email, password, phoneNumber });
+      if (response.data?.data?.accessToken) {
+        const { user: userData, accessToken } = response.data.data;
+        localStorage.setItem('mojilo_accessToken', accessToken);
+        setUser(userData);
+      }
       return response.data;
     } catch (error) {
       const msg = error.response?.data?.message || 'Registration failed';
@@ -49,6 +54,11 @@ export const AuthProvider = ({ children }) => {
   const verifyEmailOtp = async (email, otp) => {
     try {
       const response = await api.post('/auth/verify-email', { email, otp });
+      if (response.data?.data?.accessToken) {
+        const { user: userData, accessToken } = response.data.data;
+        localStorage.setItem('mojilo_accessToken', accessToken);
+        setUser(userData);
+      }
       return response.data;
     } catch (error) {
       const msg = error.response?.data?.message || 'OTP verification failed';
@@ -86,6 +96,28 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Forgot password OTP request
+  const forgotPassword = async (email) => {
+    try {
+      const response = await api.post('/auth/forgot-password', { email });
+      return response.data;
+    } catch (error) {
+      const msg = error.response?.data?.message || 'Failed to send password reset OTP';
+      throw new Error(msg);
+    }
+  };
+
+  // Reset password with OTP
+  const resetPassword = async (email, otp, newPassword) => {
+    try {
+      const response = await api.post('/auth/reset-password', { email, otp, newPassword });
+      return response.data;
+    } catch (error) {
+      const msg = error.response?.data?.message || 'Password reset failed';
+      throw new Error(msg);
+    }
+  };
+
   // Logout session
   const logout = async () => {
     try {
@@ -105,6 +137,8 @@ export const AuthProvider = ({ children }) => {
       verifyEmailOtp, 
       login, 
       googleLogin,
+      forgotPassword,
+      resetPassword,
       logout, 
       isAuthenticated: !!user,
       loading 

@@ -37,3 +37,16 @@ export const updateRefundStatus = asyncHandler(async (req, res) => {
   res.status(200).json(new ApiResponse(200, refund, `Refund status updated to ${status}`));
 });
 
+export const syncRefundStatus = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const refund = await paymentService.syncRefundStatus(id);
+  res.status(200).json(new ApiResponse(200, refund, `Refund status synced via Razorpay API/Webhook (${refund.status})`));
+});
+
+export const handleWebhook = asyncHandler(async (req, res) => {
+  const event = req.body?.event;
+  const payload = req.body?.payload || {};
+  const result = await paymentService.handleRazorpayWebhook(event, payload);
+  res.status(200).json(new ApiResponse(200, result, 'Webhook processed successfully'));
+});
+

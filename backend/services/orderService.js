@@ -14,16 +14,18 @@ import CustomCart from '../models/customCart.js';
 import Customization from '../models/Customization.js';
 import Payment from '../models/Payment.js';
 import Invoice from '../models/Invoice.js';
+import Setting from '../models/Setting.js';
 import customCartService from './customCartService.js';
 import ApiError from '../utils/ApiError.js';
 import logger from '../utils/logger.js';
 import { enqueuePrintGeneration } from './printQueueService.js';
+import notificationService from './notificationService.js';
 
 class OrderService {
   /**
    * Place an order from the user's cart, freezing all design parameters as static snapshots
    */
-  async placeOrder(userId, { paymentMethod, couponCode, shippingAddress, billingAddress, shippingMethodId, idempotencyKey }) {
+  async placeOrder(userId, { paymentMethod, couponCode, shippingAddress, billingAddress, shippingMethodId, idempotencyKey, initialPaymentStatus = 'paid', initialOrderStatus = 'confirmed' }) {
     // Idempotency check: prevent duplicate checkouts
     if (idempotencyKey) {
       const existingOrder = await Order.findOne({ idempotencyKey });
@@ -122,14 +124,23 @@ class OrderService {
     }
 
     // Taxes & Shipping
+    const setting = await Setting.findOne();
+    const shippingEnabled = setting?.shippingEnabled !== false;
+    const freeThreshold = setting?.freeShippingThreshold !== undefined ? Number(setting.freeShippingThreshold) : 999;
+    const defaultFee = setting?.defaultShippingCharge !== undefined ? Number(setting.defaultShippingCharge) : 50;
+
     const taxAmount = 0;
-    const shippingCharges = 0;
+    const shippingCharges = (shippingEnabled && subTotal < freeThreshold) ? defaultFee : 0;
     const totalAmount = Math.max(0, Math.round((subTotal - discountAmount + shippingCharges) * 100) / 100);
 
     // 4. Create Order Number
     const orderNumber = `MOJ-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    const initialStatus = 'pending';
+    const finalPaymentStatus = initialPaymentStatus || 'paid';
+    const finalOrderStatus = initialOrderStatus || 'confirmed';
+    const statusNote = finalPaymentStatus === 'paid'
+      ? 'Order placed with online payment successfully confirmed via Razorpay.'
+      : 'Order created, awaiting online payment confirmation.';
 
     // 5. Create Order with snapshot summary
     const order = await orderRepository.create({
@@ -144,8 +155,8 @@ class OrderService {
       subTotal,
       totalAmount,
       paymentMethod: 'Online',
-      paymentStatus: 'pending',
-      orderStatus: initialStatus,
+      paymentStatus: finalPaymentStatus,
+      orderStatus: finalOrderStatus,
       coupon: couponId,
       ...(idempotencyKey ? { idempotencyKey } : {}), // Conditionally include so MongoDB sparse index skips undefined keys
       pricingSummary: {
@@ -156,8 +167,8 @@ class OrderService {
         grandTotal: totalAmount
       },
       statusHistory: [{
-        status: initialStatus,
-        notes: 'Order created, awaiting online payment confirmation.',
+        status: finalOrderStatus,
+        notes: statusNote,
         updatedBy: 'system'
       }]
     });
@@ -283,6 +294,18 @@ class OrderService {
 
 
 
+    // Create admin notification for new order
+    try {
+      await notificationService.createNotification({
+        title: 'New Order Placed',
+        message: `Order #${order.orderNumber || order._id?.toString().slice(-8).toUpperCase()} placed for ₹${order.totalAmount}`,
+        type: 'order_placed',
+        link: '/orders'
+      });
+    } catch (nErr) {
+      logger.error('Failed to create order placement notification:', nErr);
+    }
+
     return {
       order,
       invoiceNumber: invoice ? invoice.invoiceNumber : null
@@ -308,6 +331,10 @@ class OrderService {
       throw new ApiError(404, 'Order not found');
     }
 
+    if (order.orderStatus?.toLowerCase() === 'cancelled') {
+      throw new ApiError(400, 'Status of a cancelled order cannot be changed');
+    }
+
     const previousStatus = order.orderStatus;
     order.orderStatus = status;
     if (status === 'delivered') {
@@ -324,6 +351,19 @@ class OrderService {
     });
 
     await order.save();
+
+    // Create admin notification for status update
+    try {
+      await notificationService.createNotification({
+        title: 'Order Status Updated',
+        message: `Order #${order.orderNumber || order._id?.toString().slice(-8).toUpperCase()} moved to ${status.toUpperCase()}`,
+        type: 'order_update',
+        link: '/orders'
+      });
+    } catch (nErr) {
+      logger.error('Failed to create status update notification:', nErr);
+    }
+
     return order;
   }
 

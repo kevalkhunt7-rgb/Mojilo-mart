@@ -896,7 +896,7 @@ export default function EditProduct() {
             )}
           </div>
 
-          {/* Size Chart Upload Card */}
+          {/* Size Chart Upload Card
           <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-[#e2e8f0] dark:border-slate-800 shadow-sm space-y-4">
             <h3 className="font-bold text-slate-800 dark:text-slate-200 text-sm border-b pb-3 border-slate-100 dark:border-slate-800 flex items-center gap-2">
               <FileText size={16} className="text-indigo-600" /> Size Chart Guide
@@ -945,7 +945,7 @@ export default function EditProduct() {
                 <p className="text-[10px] text-slate-400">Image of measurements guide</p>
               </div>
             )}
-          </div>
+          </div> */}
 
         </div>
 

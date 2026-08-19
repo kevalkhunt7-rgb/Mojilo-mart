@@ -176,6 +176,10 @@ export default function Orders() {
   }, []);
 
   const handleUpdateStatus = async (orderId, newStatus) => {
+    const targetOrder = orders.find(o => o._id === orderId);
+    if (targetOrder?.orderStatus?.toLowerCase() === 'cancelled') {
+      return toast.warning('Status of a cancelled order cannot be changed');
+    }
     try {
       await api.patch(`/orders/${orderId}/status`, { status: newStatus });
       toast.success(`Order status updated to ${newStatus.toUpperCase()}`);
@@ -400,7 +404,7 @@ export default function Orders() {
       };
     }, [anchorEl]);
 
-    if (!anchorEl || !order) return null;
+    if (!anchorEl || !order || order.orderStatus?.toLowerCase() === 'cancelled') return null;
 
     return createPortal(
       <div className="fixed inset-0 z-[999999] pointer-events-auto">
@@ -421,7 +425,7 @@ export default function Orders() {
           <p className="text-[9px] font-bold text-slate-400 dark:text-slate-400 uppercase px-2.5 py-1.5 tracking-wider border-b border-slate-100 dark:border-[#272B40] mb-1">
             Move to stage
           </p>
-          {['pending', 'confirmed', 'printing', 'packed', 'shipped', 'delivered', 'cancelled'].map((st) => {
+          {['pending', 'confirmed', 'printing', 'packed', 'shipped', 'delivered'].map((st) => {
             const currentStatus = order.orderStatus?.toLowerCase() || 'pending';
             const isCurrent = currentStatus === st || 
               (st === 'pending' && (currentStatus === 'approved' || currentStatus === 'artwork_review'));
@@ -735,20 +739,23 @@ export default function Orders() {
                               >
                                 <Eye size={14} />
                               </button>
-                              <button
-                                onClick={(e) => {
-                                  if (activeMenuId === order._id) {
-                                    setActiveMenuId(null);
-                                    setMenuAnchorEl(null);
-                                  } else {
-                                    setActiveMenuId(order._id);
-                                    setMenuAnchorEl(e.currentTarget);
-                                  }
-                                }}
-                                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 cursor-pointer"
-                              >
-                                <MoreVertical size={14} />
-                              </button>
+                              {order.orderStatus?.toLowerCase() !== 'cancelled' && (
+                                <button
+                                  onClick={(e) => {
+                                    if (activeMenuId === order._id) {
+                                      setActiveMenuId(null);
+                                      setMenuAnchorEl(null);
+                                    } else {
+                                      setActiveMenuId(order._id);
+                                      setMenuAnchorEl(e.currentTarget);
+                                    }
+                                  }}
+                                  className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 cursor-pointer"
+                                  title="Change Order Status"
+                                >
+                                  <MoreVertical size={14} />
+                                </button>
+                              )}
                             </div>
                           </div>
                         </td>
@@ -784,20 +791,23 @@ export default function Orders() {
                           >
                             <Eye size={14} />
                           </button>
-                          <button
-                            onClick={(e) => {
-                              if (activeMenuId === order._id) {
-                                setActiveMenuId(null);
-                                setMenuAnchorEl(null);
-                              } else {
-                                setActiveMenuId(order._id);
-                                setMenuAnchorEl(e.currentTarget);
-                              }
-                            }}
-                            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 cursor-pointer"
-                          >
-                            <MoreVertical size={14} />
-                          </button>
+                          {order.orderStatus?.toLowerCase() !== 'cancelled' && (
+                            <button
+                              onClick={(e) => {
+                                if (activeMenuId === order._id) {
+                                  setActiveMenuId(null);
+                                  setMenuAnchorEl(null);
+                                } else {
+                                  setActiveMenuId(order._id);
+                                  setMenuAnchorEl(e.currentTarget);
+                                }
+                              }}
+                              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 cursor-pointer"
+                              title="Change Order Status"
+                            >
+                              <MoreVertical size={14} />
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>

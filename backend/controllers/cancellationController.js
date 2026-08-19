@@ -6,6 +6,7 @@ import ApiResponse from '../utils/ApiResponse.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import ApiError from '../utils/ApiError.js';
 import logger from '../utils/logger.js';
+import notificationService from '../services/notificationService.js';
 
 // Customer: Submit a cancellation request for an order
 export const requestCancellation = asyncHandler(async (req, res) => {
@@ -61,6 +62,18 @@ export const requestCancellation = asyncHandler(async (req, res) => {
     updatedBy: req.user.name || 'Customer'
   });
   await order.save();
+
+  // Create notification for Admin
+  try {
+    await notificationService.createNotification({
+      title: 'Cancellation Requested',
+      message: `Cancellation requested for Order #${order.orderNumber || order._id?.toString().slice(-8).toUpperCase()}`,
+      type: 'cancellation_requested',
+      link: '/orders'
+    });
+  } catch (nErr) {
+    logger.error('Failed to create cancellation notification:', nErr);
+  }
 
   res.status(201).json(new ApiResponse(201, cancellationRequest, 'Cancellation request submitted successfully'));
 });
